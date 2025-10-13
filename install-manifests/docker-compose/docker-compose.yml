@@ -17,6 +17,7 @@ services:
 
   cubestore:
     image: cubejs/cubestore:${CUBESTORE_VERSION:-v0.35.33}
+    platform: linux/amd64
     environment:
       - CUBESTORE_REMOTE_DIR=/cube/data
     volumes:
@@ -24,6 +25,7 @@ services:
 
   stack:
     image: synmetrix/stack:${STACK_VERSION:-latest}
+    platform: linux/amd64
     restart: always
     ports:
       - 80:8888 # nginx app
