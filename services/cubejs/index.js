@@ -73,9 +73,6 @@ const options = {
       ? parseInt(CUBEJS_REFRESH_TIMER, 10)
       : undefined,
   scheduledRefreshContexts,
-  externalDbType: "cubestore",
-  externalDriverFactory,
-  cacheAndQueueDriver: "cubestore",
   logger: logging,
 
   // sql server
