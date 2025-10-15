@@ -1,9 +1,9 @@
-ARG HASURA_VERSION=v2.37.0
+ARG HASURA_VERSION=v2.40.2
 ARG HASURA_CLI_VERSION=${HASURA_VERSION}.cli-migrations-v3
 
 FROM hasura/graphql-engine:$HASURA_CLI_VERSION
 
-ARG HASURA_VERSION=v2.37.0
+ARG HASURA_VERSION=v2.40.2
 
 RUN apt-get update -y && apt-get install -y curl build-essential
 RUN curl http://archive.ubuntu.com/ubuntu/pool/main/s/socat/socat_1.7.4.1.orig.tar.gz -o /tmp/socat_1.7.4.1.orig.tar.gz
