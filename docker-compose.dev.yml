@@ -120,6 +120,8 @@ services:
     environment:
       ENABLE_TELEMETRY: "false"
       CONSOLE_MODE: server
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
     depends_on:
       - postgres
       - redis
