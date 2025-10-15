@@ -486,7 +486,6 @@ const externalDriverFactory = async () =>
 **多层缓存**:
 1. **查询结果缓存** - Cubestore
 2. **Schema 编译缓存** - 内存
-3. **Redis 缓存** - 配置和会话数据
 
 **缓存配置**:
 ```javascript
@@ -606,12 +605,6 @@ logger: logging
 ```json
 "pg": "^8.7.1",
 "pg-connection-string": "^2.2.0"
-```
-
-**缓存**:
-```json
-"ioredis": "^5.3.2",
-"redis": "^4.6.4"
 ```
 
 **工具库**:

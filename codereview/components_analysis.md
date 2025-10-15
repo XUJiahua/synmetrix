@@ -22,7 +22,7 @@ volumes:
 
 ## 组件详细分析
 
-### 1. Redis （必须）
+### 1. Redis (错误的分析)
 
 ```yaml
 redis:

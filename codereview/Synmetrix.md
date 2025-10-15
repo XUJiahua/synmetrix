@@ -390,7 +390,7 @@ Synmetrix 提供开箱即用的完整技术栈:
 - **MinIO**: S3 兼容对象存储 (端口 9000, 9001)
 
 #### 缓存和消息:
-- **Redis**: 缓存层 (端口 6379)
+- **Redis**: (端口 6379)
 
 #### 开发工具:
 - **Mailhog**: 邮件测试 (SMTP: 1025, UI: 8025)
@@ -570,7 +570,6 @@ const repositoryFactory = ({ securityContext }) => {
 ## 📈 性能优化
 
 ### 1. 多层缓存架构
-- Redis: 元数据和查询结果缓存
 - Cubestore: 预聚合数据存储
 - Compiler Cache: Schema 编译缓存
 

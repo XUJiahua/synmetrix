@@ -808,7 +808,6 @@ Client → Hasura (8080) → Actions (3000) → Cube.js (4000) → Database
 4. **缓存**:
    - Hasura 查询缓存
    - Cube.js 预聚合缓存
-   - Redis 缓存层
 
 #### Actions vs 直接暴露 Cube.js 的权衡
 

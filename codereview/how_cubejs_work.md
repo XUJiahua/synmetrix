@@ -74,12 +74,11 @@ Cube.js 解决了现代数据基础设施的四大挑战：
 **缓存和队列驱动架构**:
 - **Memory**: 内存缓存和队列（开发环境）
 - **CubeStore**: 分布式存储引擎（生产环境）
-- **Redis**: 基于 Redis 的缓存（遗留，正在逐步淘汰）
 
 **驱动选择逻辑**:
 1. 显式配置 (`cacheAndQueueDriver` 选项)
 2. 环境变量 (`CUBEJS_CACHE_AND_QUEUE_DRIVER`)
-3. 自动检测: Redis (如果 `CUBEJS_REDIS_URL` 存在)、CubeStore (生产)、Memory (开发)
+3. 自动检测: CubeStore (生产)、Memory (开发)
 
 ### API Gateway (API 网关)
 **位置**: `packages/cubejs-api-gateway`
@@ -291,7 +290,7 @@ sequenceDiagram
 - 每个租户可以有独立的数据源和配置
 
 ### 2. 缓存和队列系统
-- **三种后端支持**: Memory、Redis、CubeStore
+- **2 种后端支持**: Memory(default)、CubeStore
 - **自动驱动选择**: 根据环境和配置自动选择最佳驱动
 - **查询去重**: 相同查询只执行一次，其他请求等待结果
 
@@ -459,7 +458,6 @@ cargo test --bin cubesqld
 ### 数据库和存储
 - **多种数据源驱动**: 支持 20+ 数据库
 - **CubeStore**: 自研分布式存储
-- **Redis**: 可选缓存后端
 
 ## 架构优势
 

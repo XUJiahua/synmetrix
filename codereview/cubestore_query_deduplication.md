@@ -182,7 +182,6 @@ Cube.js 支持三种队列驱动模式（在 `QueryQueue.ts:52-68` 中定义）�
 
 1. **memory** (LocalQueueDriver) - 内存模式
 2. **cubestore** (CubeStoreQueueDriver) - CubeStore 模式
-3. ~~**redis**~~ (已废弃)
 
 ### Memory 模式的去重机制
 
