@@ -13,7 +13,7 @@ Synmetrix (previously MLCraft) is an open source data engineering platform and s
 Synmetrix is built as a microservices architecture with the following core components:
 
 1. **cubejs** (`services/cubejs/`) - The core analytics engine
-   - Built on Cube.js v1.2.3
+   - Built on Cube.js v1.3.39
    - Handles data modeling, query generation, and SQL API
    - Exposes REST API on port 4000 and SQL APIs (MySQL: 13306, PostgreSQL: 15432)
    - Uses `repositoryFactory` to dynamically load data schema files from the database
@@ -142,7 +142,7 @@ Key environment variables:
 - `CUBEJS_SECRET` - Cube.js API secret
 - `JWT_KEY` - JWT signing key
 - `POSTGRES_VERSION` - Currently 12
-- `CUBESTORE_VERSION` - Currently v1.2.3
+- `CUBESTORE_VERSION` - Currently v1.3.39
 - `HASURA_VERSION` - Currently v2.40.2
 
 ## Common Development Workflows
@@ -206,7 +206,7 @@ Both cubejs and actions services share similar utilities:
 ## Important Technical Notes
 
 ### Cube.js Version
-Currently on v1.2.3 (all @cubejs-backend/* packages must match)
+Currently on v1.3.39 (all @cubejs-backend/* packages must match)
 
 ### Database Driver Support
 Cube.js service includes drivers for:

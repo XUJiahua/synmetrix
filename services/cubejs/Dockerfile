@@ -1,4 +1,4 @@
-FROM node:18.20.4-bullseye
+FROM node:20.19.5-bullseye
 
 ARG DATABRICKS_JDBC_URL=https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.32/DatabricksJDBC42-2.6.32.1054.zip
 
@@ -28,7 +28,7 @@ ENV PATH /app/node_modules/.bin:$PATH
 COPY yarn.lock /app/yarn.lock
 COPY package.json /app/package.json
 
-RUN yarn --network-timeout 100000
+RUN yarn --network-timeout 100000 --verbose
 
 COPY index.js /app/
 COPY src/ /app/src/
