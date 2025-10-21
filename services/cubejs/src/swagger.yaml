@@ -10,25 +10,42 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    TableSchema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Table name
+        schema:
+          type: string
+          description: Database schema name (e.g., 'public')
+      required:
+        - name
     GenerateDataSchemaRequest:
       type: object
       properties:
         tables:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/TableSchema'
+          description: Array of table objects with name and schema
         overwrite:
           type: boolean
+          description: Whether to overwrite existing data models
         branchId:
           type: string
+          format: uuid
+          description: Branch ID for the data models
         format:
           type: string
           default: yaml
+          enum:
+            - yaml
+            - js
+          description: Format for generated data models
       required:
         - tables
-        - overwrite
         - branchId
-        - format
     PreAggregationPreviewRequest:
       type: object
       properties:
@@ -220,7 +237,7 @@ paths:
           description: 'Successful operation'
       security:
         - BearerAuth: []
-  /api/v1/generate-dataschema:
+  /api/v1/generate-models:
     post:
       summary: 'Generate data models from the datasource tables'
       requestBody:
