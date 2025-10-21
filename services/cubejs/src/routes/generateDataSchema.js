@@ -81,6 +81,8 @@ export default async (req, res, cubejs) => {
     }));
 
     let files;
+    // - overwrite=true: 新生成的文件覆盖同名文件
+    // - overwrite=false: 保留已有文件,只添加新文件
     if (overwrite) {
       files = filterFiles(newFiles, existedFiles);
     } else {
