@@ -9,6 +9,7 @@ const connParamValid = (port) => {
 };
 
 const MSSQL_DEFAULT_PORT = 1433;
+const ORACLE_DEFAULT_PORT = 1521;
 
 /**
  * Prepares the database parameters based on the provided dbParams and dbType.
@@ -65,6 +66,15 @@ const prepareDbParams = (dbParams, dbType) => {
         ...dbConfig,
         server: dbConfig.host,
         port: parseInt(dbConfig.port) || MSSQL_DEFAULT_PORT,
+      };
+      break;
+    case "oracle":
+      dbConfig = {
+        host: dbConfig.host,
+        port: parseInt(dbConfig.port) || ORACLE_DEFAULT_PORT,
+        db: dbConfig.serviceName || dbConfig.database,
+        user: dbConfig.user,
+        password: dbConfig.password,
       };
       break;
     case "clickhouse":
