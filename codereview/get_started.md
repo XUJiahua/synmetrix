@@ -73,3 +73,29 @@ Frontend -> Hasura GraphQL -> Actions API -> CubeJS API
 
 * 如果你要连接的服务**已经提供了 GraphQL API**，那么毫无疑问，使用 **Remote Schemas**。这是最直接、最高效的方式。
 * 如果你需要实现一段**自定义代码**（比如数据验证、调用另一个 REST API、发送通知等），并且希望把它作为 GraphQL API 的一部分暴露给前端，那么使用 **Actions**。
+
+
+## cubejs dev
+
+cubejs codebase 本身是一个 yarn monorepo。repo 之间有相互依赖。repo 使用 TS 开发，但是使用编译后的 dist 下的 JS 分发。先在根目录执行 TS->JS 的转译：
+
+```
+yarn tsc
+```
+
+开发 cubejs-schema-compiler 模块：
+
+```
+cd packages/cubejs-schema-compiler
+yarn install
+# TS代码改动，记得先 yarn tsc 后测试
+yarn unit
+# 包含集成测试，集成测试消耗大量资源，另外最好有个干净环境做测试
+yarn test
+```
+
+https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md
+
+### PRs
+
+1. fix(schema-compiler): Add missing numeric types to ScaffoldingSchema columnType mapping #10079 https://github.com/cube-js/cube/pull/10079

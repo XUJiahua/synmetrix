@@ -6,6 +6,7 @@ import { fetchGraphQL } from "../utils/graphql.js";
 import dateParser from "./dateParser.js";
 import pickKeys from "./pickKeys.js";
 import { DEFAULT_CATEGORIES } from "./playgroundState.js";
+import logger from "./logger.js";
 
 const accessListQuery = `
   query ($userId: uuid!, $dataSourceId: uuid!) {
@@ -149,46 +150,109 @@ const cubejsApi = ({ dataSourceId, branchId, userId, authToken }) => {
 
   const fetchCubeJS = async ({ route, method = "get", params }) => {
     const url = `${apiUrl}${route}`;
+    const startTime = Date.now();
     let res;
 
     let signal = timeoutSignal(10 * 1000);
+    let timeoutMs = 10 * 1000;
 
-    if (route === "/get-schema" || route === "/generate-dataschema") {
+    if (route === "/get-schema" || route === "/generate-models" || route === "/run-sql") {
       signal = timeoutSignal(180 * 1000);
+      timeoutMs = 180 * 1000;
     }
 
-    if (method === "get") {
-      res = await fetch(url, {
-        headers: reqHeaders,
-        params,
-        signal,
-      });
-    } else {
-      res = await fetch(url, {
-        headers: {
-          ...reqHeaders,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        body: JSON.stringify(params),
-        signal,
-      });
-    }
-
-    let data = await res.text();
+    // Log request
+    logger.info("cubejsApi: Request started", {
+      url,
+      route,
+      method,
+      params: params ? JSON.stringify(params).substring(0, 500) : undefined, // Limit params size
+      dataSourceId,
+      branchId,
+      userId,
+      timeoutMs,
+    });
 
     try {
-      data = JSON.parse(data);
+      if (method === "get") {
+        res = await fetch(url, {
+          headers: reqHeaders,
+          params,
+          signal,
+        });
+      } else {
+        res = await fetch(url, {
+          headers: {
+            ...reqHeaders,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          body: JSON.stringify(params),
+          signal,
+        });
+      }
+
+      let data = await res.text();
+      const duration = Date.now() - startTime;
+
+      try {
+        data = JSON.parse(data);
+      } catch (err) {
+        // do nothing
+      }
+
+      if (res.status < 200 || res.status >= 400) {
+        // Log error response
+        logger.error("cubejsApi: Request failed", {
+          url,
+          route,
+          method,
+          status: res.status,
+          statusText: res.statusText,
+          response: typeof data === "string" ? data.substring(0, 500) : JSON.stringify(data).substring(0, 500),
+          dataSourceId,
+          branchId,
+          userId,
+          duration,
+        });
+        return Promise.reject(data);
+      }
+
+      // Log success response
+      logger.info("cubejsApi: Request completed", {
+        url,
+        route,
+        method,
+        status: res.status,
+        responseSize: typeof data === "string" ? data.length : JSON.stringify(data).length,
+        dataSourceId,
+        branchId,
+        userId,
+        duration,
+      });
+
+      return data;
     } catch (err) {
-      // do nothing
-    }
+      const duration = Date.now() - startTime;
 
-    if (res.status < 200 || res.status >= 400) {
-      return Promise.reject(data);
-    }
+      // Log exception
+      logger.error("cubejsApi: Request exception", {
+        url,
+        route,
+        method,
+        error: err.message || String(err),
+        errorType: err.name,
+        isTimeout: err.name === "AbortError" || err.message?.includes("timeout"),
+        dataSourceId,
+        branchId,
+        userId,
+        duration,
+        stack: err.stack,
+      });
 
-    return data;
+      throw err;
+    }
   };
 
   return {
