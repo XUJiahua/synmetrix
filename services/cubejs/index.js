@@ -3,9 +3,19 @@ import express from "express";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
+import oracledb from "oracledb";
 
 import routes from "./src/routes/index.js";
 import { logging } from "./src/utils/logging.js";
+
+// Initialize Oracle Client in Thick mode to support older Oracle versions
+try {
+  oracledb.initOracleClient();
+  console.log('Oracle Client initialized in Thick mode');
+} catch (err) {
+  console.warn('Oracle Client Thick mode initialization failed:', err.message);
+  console.warn('Will use Thin mode (requires Oracle 12.1+)');
+}
 
 import { checkAuth } from "./src/utils/checkAuth.js";
 import checkSqlAuth from "./src/utils/checkSqlAuth.js";
