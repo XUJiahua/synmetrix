@@ -1,0 +1,76 @@
+FROM node:20.19.5-bullseye
+
+ARG DATABRICKS_JDBC_URL=https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.32/DatabricksJDBC42-2.6.32.1054.zip
+ARG ORACLE_CLIENT_BASEURL=https://download.oracle.com/otn_software/linux/instantclient
+ARG ORACLE_CLIENT_BUILD=2113000
+ARG ORACLE_CLIENT_MAJOR=21
+ARG ORACLE_CLIENT_MINOR=13
+
+RUN DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 libaio1 curl wget unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV TERM=rxvt-unicode
+ENV NODE_ENV=production
+
+# Required for node-oracledb to buld on ARM64
+RUN apt-get update \
+    && apt-get install -y python3 gcc g++ make cmake libc-bin libc6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    apt-get install -y wget apt-transport-https ca-certificates gnupg && \
+    wget -qO - https://apt.corretto.aws/corretto.key | apt-key add - && \
+    echo "deb https://apt.corretto.aws stable main" | tee /etc/apt/sources.list.d/corretto.list
+
+RUN apt-get update && apt-get install -y java-1.8.0-amazon-corretto-jdk
+
+ENV ORACLE_HOME=/opt/oracle/instantclient_${ORACLE_CLIENT_MAJOR}_${ORACLE_CLIENT_MINOR}
+ENV OCI_LIB_DIR=${ORACLE_HOME}
+ENV OCI_INC_DIR=${ORACLE_HOME}/sdk/include
+ENV LD_LIBRARY_PATH=${ORACLE_HOME}:${LD_LIBRARY_PATH}
+
+# Install Oracle Instant Client (thick mode) for amd64 images.
+RUN set -eux; \
+    if [ "$(dpkg --print-architecture)" != "amd64" ]; then \
+      echo "Oracle Instant Client thick mode requires an amd64 base image."; \
+      exit 1; \
+    fi; \
+    mkdir -p /opt/oracle; \
+    download_dir=/tmp/oracle-instantclient; \
+    rm -rf "${download_dir}"; \
+    mkdir -p "${download_dir}"; \
+    base_url="${ORACLE_CLIENT_BASEURL}/${ORACLE_CLIENT_BUILD}"; \
+    version="${ORACLE_CLIENT_MAJOR}.${ORACLE_CLIENT_MINOR}.0.0.0"; \
+    for component in basic sqlplus sdk; do \
+      file="instantclient-${component}-linux.x64-${version}dbru.zip"; \
+      curl -fL --retry 3 --retry-delay 5 --retry-connrefused "${base_url}/${file}" -o "${download_dir}/${file}"; \
+      unzip -q "${download_dir}/${file}" -d /opt/oracle; \
+      rm "${download_dir}/${file}"; \
+    done; \
+    rmdir "${download_dir}"; \
+    rm -f /opt/oracle/instantclient; \
+    ln -s "${ORACLE_HOME}" /opt/oracle/instantclient; \
+    echo "${ORACLE_HOME}" > /etc/ld.so.conf.d/oracle-instantclient.conf; \
+    ldconfig; \
+    ln -sf /opt/oracle/instantclient/sqlplus /usr/local/bin/sqlplus
+
+ENV PATH=/opt/oracle/instantclient:$PATH
+
+WORKDIR /app
+ENV PATH=/app/node_modules/.bin:$PATH
+
+COPY yarn.lock /app/yarn.lock
+COPY package.json /app/package.json
+
+RUN yarn --network-timeout 100000 --verbose
+
+COPY index.js /app/
+COPY src/ /app/src/
+
+RUN wget -qO /tmp/DatabricksJDBC.zip "${DATABRICKS_JDBC_URL}" && \
+    unzip /tmp/DatabricksJDBC.zip -d /app && \
+    rm /tmp/DatabricksJDBC.zip
+
+CMD ["yarn", "start.dev"]

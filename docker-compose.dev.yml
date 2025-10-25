@@ -42,8 +42,11 @@ services:
       - synmetrix_default
 
   cubejs:
+    # test for x64 build
+    platform: linux/amd64
     build:
       context: ./services/cubejs
+      dockerfile: Dockerfile.oracle
     image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
@@ -64,6 +67,8 @@ services:
       - synmetrix_default
 
   cubejs_refresh_worker:
+    # test for x64 build
+    platform: linux/amd64
     image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
