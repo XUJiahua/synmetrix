@@ -4,6 +4,7 @@ https://gemini.google.com/app/2750de741e12171a
 根据实践，目前 cube.js 不支持 Oracle 11g：
 1. 要求 thick mode 连接，要求安装客户端库（已经解决）
 2. 不支持一些现代的 SQL 语法（需要修改 cube.js，写兼容 Oracle 11g 的代码）
+3. 官方也不打算支持 Oracle 11g https://github.com/cube-js/cube/issues/562
 
 ## Oracle 版本
 
@@ -52,3 +53,14 @@ SELECT
 
 1. FETCH NEXT 1000 ROWS ONLY 仅在 Oracle 12c、18c、19c、21c、23c 等所有 12.1 版本及之后的数据库中受支持。如果您在 11g 或更早的版本上运行它，将会收到一个语法错误。
 2. 11g 限制行数： 使用 ROWNUM <= N
+
+## 支持 Oracle 11g 的可行性分析
+
+基于 `packages/cubejs-schema-compiler/src/adapter/OracleQuery.ts` 的实现，分页逻辑采用了 Oracle 12c 引入的 `OFFSET … FETCH NEXT … ROWS ONLY` 语法；在 11g 上执行会直接触发 `ORA-00933`。为了兼容 11g，需要围绕 Cube.js 的查询生成链路做更大范围的改造：
+
+- **适配分页包装**：目前 `groupByDimensionLimit()` 固定返回 `OFFSET/FETCH` 字符串，并在 `BaseQuery#simpleQuery`、预聚合和 rollup 查询的 SQL 末尾拼接。11g 只能使用 `ROWNUM` 或 `ROW_NUMBER()` 方案，必须在最终 SQL 外再包一层 `SELECT * FROM ( … ) WHERE rnum …`。这意味着 OracleQuery 需要覆写 `simpleQuery()` 或 `buildParamAnnotatedSql()`，以统一包装所有分页场景，避免遗漏。
+- **处理 offset 语义**：`ROWNUM` 只能做“前 N 行”裁剪；若存在 offset，需要两层嵌套（`ROWNUM <= offset + limit`，再筛 `rnum > offset`），且要求内层稳定排序。当前编译器在无排序需求时会省略 `ORDER BY`，因此要么强制补充默认排序，要么限制 offset 的使用。
+- **驱动侧调整**：`packages/cubejs-oracle-driver/driver/OracleDriver.js:157` 的 `wrapQueryWithLimit` 仅覆盖 `limit`，且生成的 `FROM (…) AS t` 在 Oracle 上非法。若继续利用该钩子，也需同步去掉 `AS` 并扩展 offset 逻辑。
+- **其它语法**：`TRUNC` 分组、`TO_TIMESTAMP_TZ` 等函数在 11g 中可正常使用，不构成额外阻碍。
+
+综上，兼容 11g 在工程上可行，但需为 Oracle 单独实现 ROWNUM 分页封装并覆盖查询生成的多个路径，同时补齐 offset 行为和测试（含预聚合、totalQuery 等）。建议在实现时提供显式开关（如 `oracleVersion`），并配套 11g SQL 生成 & 集成测试回归，以降低回归风险。
