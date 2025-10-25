@@ -78,6 +78,8 @@ services:
     env_file:
       - .env
       - .dev.env
+    depends_on:
+      - cubejs
     environment:
       CUBEJS_REFRESH_TIMER: 60
       CUBEJS_SCHEDULED_REFRESH: true
