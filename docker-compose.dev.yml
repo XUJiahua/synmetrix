@@ -44,6 +44,7 @@ services:
   cubejs:
     build:
       context: ./services/cubejs
+    image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
     volumes:
@@ -63,8 +64,7 @@ services:
       - synmetrix_default
 
   cubejs_refresh_worker:
-    build:
-      context: ./services/cubejs
+    image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
     volumes:
