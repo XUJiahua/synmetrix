@@ -198,7 +198,7 @@ services:
         CUBEJS_API_DOCS_URL: http://localhost:4000/docs
     restart: always
     ports:
-      - 80:8888
+      - 8888:8888
       - 9055:9055
     depends_on:
       - hasura
