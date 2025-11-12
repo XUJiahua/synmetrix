@@ -994,9 +994,6 @@ describe('Row-Level Security Integration', () => {
 - [ ] 编写集成测试
 - [ ] 更新 API 文档
 - [ ] 创建用户配置指南
-- [ ] 部署到 staging 环境
-- [ ] 执行安全审计
-- [ ] 部署到生产环境
 
 ## 未来扩展
 

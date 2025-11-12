@@ -1214,74 +1214,6 @@ keycloak.init({ onLoad: 'login-required' }).then(authenticated => {
 
 ### 7.4 生产部署
 
-#### 步骤 10: 灰度发布（可选）
-
-```yaml
-# 同时运行两套认证系统
-# docker-compose.prod.yml
-
-services:
-  # 旧系统
-  hasura_plus:
-    # ... 保持不变
-
-  # 新系统
-  keycloak:
-    # ... Keycloak 配置
-
-  # Hasura 配置支持两种 JWT
-  hasura:
-    environment:
-      HASURA_GRAPHQL_JWT_SECRET: |
-        [
-          {
-            "type": "HS256",
-            "key": "${OLD_JWT_KEY}"
-          },
-          {
-            "type": "RS256",
-            "jwk_url": "http://keycloak:8080/realms/synmetrix/protocol/openid-connect/certs",
-            "claims_namespace": "https://hasura.io/jwt/claims"
-          }
-        ]
-```
-
-**特性开关**:
-
-```javascript
-// 前端使用特性开关
-const USE_KEYCLOAK = process.env.REACT_APP_USE_KEYCLOAK === 'true';
-
-if (USE_KEYCLOAK) {
-  // Keycloak 登录
-  initKeycloak();
-} else {
-  // 旧版 hasura_plus 登录
-  loginWithEmail(email, password);
-}
-```
-
-#### 步骤 11: 完全切换
-
-```bash
-# 1. 停止 hasura_plus
-docker-compose stop hasura_plus
-
-# 2. 验证所有功能正常
-# 运行完整测试套件
-
-# 3. 备份并归档 auth schema
-docker exec synmetrix-postgres pg_dump -U postgres -n auth synmetrix \
-  > auth_schema_archive_$(date +%Y%m%d).sql
-
-# 4. 删除 hasura_plus 配置
-# 从 docker-compose.yml 移除 hasura_plus 服务
-
-# 5. 更新文档
-```
-
----
-
 ## 8. 风险评估与缓解
 
 ### 8.1 主要风险
@@ -1584,10 +1516,3 @@ HASURA_GRAPHQL_JWT_SECRET='{"type":"RS256","jwk_url":"http://keycloak:8080/realm
 - ✅ 可扩展性（支持多 Realm、多 Client）
 - ✅ 统一身份管理（可集成其他系统）
 
-**迁移建议**:
-- 🔄 采用灰度发布，逐步切换用户
-- 🔄 保持双 JWT 支持一段时间
-- 🔄 充分测试所有认证流程
-- 🔄 准备快速回滚方案
-
-**预计迁移周期**: 2-4 周（取决于用户规模和测试复杂度）
