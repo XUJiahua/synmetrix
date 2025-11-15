@@ -1,0 +1,167 @@
+version: '3.8'
+
+networks:
+  synmetrix_default:
+
+services:
+  redis:
+    image: redis:7.0.0
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      - synmetrix_default
+
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    restart: always
+    ports:
+      - 5432:5432
+    volumes:
+      - pgstorage-data:/var/lib/postgresql/data
+      # Postgres only runs /docker-entrypoint-initdb.d/*.sql while it is creating a brand-new data directory. Once the db_data volume already exists, that init phase never replays
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - synmetrix_default
+
+  actions:
+    build:
+      context: ./services/actions/
+    restart: always
+    command: yarn start.dev
+    volumes:
+      - ./services/actions/src:/app/src
+      - ./services/actions/index.js:/app/index.js
+    env_file:
+      - .env
+      - .my.env
+    networks:
+      - synmetrix_default
+
+  cubejs:
+    build:
+      context: ./services/cubejs
+      dockerfile: Dockerfile.oracle
+    restart: always
+    command: yarn start.dev
+    volumes:
+      - ./services/cubejs/src:/app/src
+      - ./services/cubejs/index.js:/app/index.js
+    ports:
+      - 4000:4000
+      - 9231:9229
+      - 13306:13306
+      - 15432:15432
+    env_file:
+      - .env
+      - .my.env
+    environment:
+      CUBEJS_SCHEDULED_REFRESH: false
+    networks:
+      - synmetrix_default
+
+  cubejs_refresh_worker:
+    build:
+      context: ./services/cubejs
+      dockerfile: Dockerfile.oracle
+    restart: always
+    command: yarn start.dev
+    volumes:
+      - ./services/cubejs/src:/app/src
+      - ./services/cubejs/index.js:/app/index.js
+    env_file:
+      - .env
+      - .my.env
+    depends_on:
+      - cubejs
+    environment:
+      CUBEJS_REFRESH_TIMER: 60
+      CUBEJS_SCHEDULED_REFRESH: true
+      CUBEJS_SQL_API: false
+    networks:
+      - synmetrix_default
+
+  hasura_cli:
+    build:
+      context: ./scripts/containers/hasura-cli
+      args:
+        HASURA_VERSION: ${HASURA_VERSION}
+    restart: always
+    command: ./start.sh
+    ports:
+      - 9695:9695
+      - 9693:9693
+    env_file:
+      - .env
+      - .my.env
+    environment:
+      ENABLE_TELEMETRY: "false"
+      CONSOLE_MODE: cli
+    volumes:
+      - ./services/hasura/migrations:/hasura/migrations
+      - ./services/hasura/metadata:/hasura/metadata
+      - ./services/hasura/config.yaml:/hasura/config.yaml
+    depends_on:
+      - hasura
+    networks:
+      - synmetrix_default
+
+  hasura:
+    image: hasura/graphql-engine:${HASURA_VERSION}
+    restart: always
+    ports:
+      - 8080:8080
+    env_file:
+      - .env
+      - .my.env
+    volumes:
+      - ./services/hasura/migrations:/hasura-migrations
+      - ./services/hasura/metadata:/hasura-metadata
+      - ./services/hasura/seeds:/seeds
+    environment:
+      ENABLE_TELEMETRY: "false"
+      CONSOLE_MODE: server
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - synmetrix_default
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.4
+    command: start-dev
+    depends_on:
+      - postgres
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: "5432"
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_DB_SCHEMA: public
+    ports:
+      - "8082:8080"
+    networks:
+      - synmetrix_default
+
+  cubestore:
+    image: cubejs/cubestore:${CUBESTORE_VERSION}
+    restart: always
+    ports:
+      - 3030:3030
+    environment:
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+    networks:
+      - synmetrix_default
+
+volumes:
+  pgstorage-data:
