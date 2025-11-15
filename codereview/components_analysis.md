@@ -58,7 +58,7 @@ redis:
 
 ```yaml
 postgres:
-  image: postgres:${POSTGRES_VERSION:-12}
+  image: postgres:${POSTGRES_VERSION}
   volumes:
     - pg_db_data:/var/lib/postgresql/data
   environment:

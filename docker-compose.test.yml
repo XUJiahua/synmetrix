@@ -14,7 +14,7 @@ services:
       - synmetrix_default
 
   postgres_test:
-    image: postgres:${POSTGRES_VERSION:-12}
+    image: postgres:${POSTGRES_VERSION}
     volumes:
       - ./tests/data/orders.sql:/docker-entrypoint-initdb.d/orders.sql
     environment:
