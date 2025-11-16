@@ -27,7 +27,7 @@ Synmetrix is built as a microservices architecture with the following core compo
    - Communicates with Cube.js API and Hasura GraphQL
 
 3. **hasura** (`services/hasura/`) - GraphQL API layer
-   - Hasura v2.40.2 on port 8080
+   - Hasura v2.46.0 on port 8080
    - Provides GraphQL API for frontend and auth
    - Stores metadata in `services/hasura/metadata/`
    - Migrations in `services/hasura/migrations/`
@@ -143,7 +143,7 @@ Key environment variables:
 - `JWT_KEY` - JWT signing key
 - `POSTGRES_VERSION` - Currently 12
 - `CUBESTORE_VERSION` - Currently v1.3.39
-- `HASURA_VERSION` - Currently v2.40.2
+- `HASURA_VERSION` - Currently v2.46.0
 
 ## Common Development Workflows
 

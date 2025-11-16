@@ -4,7 +4,7 @@
 
 Synmetrix uses a multi-layered authentication system built with:
 - **Hasura Backend Plus (v2.7.1)** - Handles user registration, login, password management, and JWT token generation
-- **Hasura GraphQL Engine (v2.40.2)** - GraphQL API with JWT validation
+- **Hasura GraphQL Engine (v2.46.0)** - GraphQL API with JWT validation
 - **Cube.js** - Analytics engine with per-datasource security context
 - **Custom Auth Middleware** - Validates JWT tokens and builds user scope
 

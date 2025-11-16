@@ -569,7 +569,7 @@ services:
 
   # Hasura（可多实例）
   hasura:
-    image: hasura/graphql-engine:v2.40.2
+    image: hasura/graphql-engine:v2.46.0
     deploy:
       replicas: 2
     depends_on:

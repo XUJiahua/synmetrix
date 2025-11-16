@@ -6,7 +6,7 @@ https://hasura.io/docs/2.0/getting-started/docker-simple/
 
 ## 概述
 
-`services/hasura/` 是 Synmetrix 架构中的 **GraphQL API 层**,基于 Hasura v2.40.2 构建,运行在端口 8080。作为系统的 API 网关,它为前端提供统一的 GraphQL 接口,并负责认证授权、权限控制和业务流程编排。
+`services/hasura/` 是 Synmetrix 架构中的 **GraphQL API 层**,基于 Hasura v2.46.0 构建,运行在端口 8080。作为系统的 API 网关,它为前端提供统一的 GraphQL 接口,并负责认证授权、权限控制和业务流程编排。
 
 ## 架构定位
 
@@ -428,7 +428,7 @@ CREATE TRIGGER set_public_dataschemas_checksum
 
 ```bash
 # Hasura 配置
-HASURA_VERSION=v2.40.2
+HASURA_VERSION=v2.46.0
 HASURA_GRAPHQL_ADMIN_SECRET=<admin_secret>
 HASURA_GRAPHQL_JWT_SECRET=<jwt_secret>
 
@@ -477,7 +477,7 @@ POSTGRES_DB=synmetrix
 
 ## 版本管理
 
-- **Hasura 版本**: v2.40.2
+- **Hasura 版本**: v2.46.0
 - **元数据版本**: 在 `metadata/version.yaml` 中定义
 - **迁移版本**: 基于时间戳的顺序迁移
 - **向后兼容**: 迁移支持 up/down 回滚

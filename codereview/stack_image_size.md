@@ -388,7 +388,7 @@ services:
     image: synmetrix/frontend:latest  # ~100MB (Nginx + 静态文件)
 
   hasura:
-    image: hasura/graphql-engine:v2.40.2  # ~140MB (官方镜像)
+    image: hasura/graphql-engine:v2.46.0  # ~140MB (官方镜像)
 
   cubejs:
     image: synmetrix/cubejs:latest    # ~500MB (Node + 数据库驱动)
