@@ -83,48 +83,30 @@ services:
     networks:
       - synmetrix_default
 
-  hasura_cli:
-    build:
-      context: ./scripts/containers/hasura-cli
-      args:
-        HASURA_VERSION: ${HASURA_VERSION}
-    restart: always
-    command: ./start.sh
-    ports:
-      - 9695:9695
-      - 9693:9693
-    env_file:
-      - .env
-      - .my.env
-    environment:
-      ENABLE_TELEMETRY: "false"
-      CONSOLE_MODE: cli
-    volumes:
-      - ./services/hasura/migrations:/hasura/migrations
-      - ./services/hasura/metadata:/hasura/metadata
-      - ./services/hasura/config.yaml:/hasura/config.yaml
-    depends_on:
-      - hasura
-    networks:
-      - synmetrix_default
-
   hasura:
     image: hasura/graphql-engine:${HASURA_VERSION}
+    # fixme: error applying metadata \n{\n  \"error\": \"key \\"tables\\" not found\",\n  \"path\": \"$.args.metadata\",\n  \"code\": \"parse-failed
+    # image: hasura/graphql-engine:${HASURA_VERSION}.cli-migrations-v3
     restart: always
     ports:
       - 8080:8080
-    env_file:
-      - .env
-      - .my.env
     volumes:
       - ./services/hasura/migrations:/hasura-migrations
       - ./services/hasura/metadata:/hasura-metadata
       - ./services/hasura/seeds:/seeds
     environment:
       ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: ${HASURA_GRAPHQL_METADATA_DATABASE_URL}
+      PG_DATABASE_URL: ${PG_DATABASE_URL}
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET}
+      HASURA_GRAPHQL_JWT_SECRET: ${HASURA_GRAPHQL_JWT_SECRET}
       CONSOLE_MODE: server
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
-      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "false"
+      HASURA_GRAPHQL_MIGRATIONS_DIR: "/hasura-migrations"
+      HASURA_GRAPHQL_METADATA_DIR: "/hasura-metadata"
+      # fix: metadata apply inconsistence 实际替换发生在 Hasura 服务器：当 Hasura 服务启动时，如果元数据中有 {{ACTIONS_URL}}，它会查找 Hasura 容器内的环境变量 ACTIONS_URL
+      ACTIONS_URL: ${ACTIONS_URL}
     depends_on:
       postgres:
         condition: service_started
