@@ -1,19 +1,110 @@
 import jwt from "jsonwebtoken";
+import JwksRsa from "jwks-rsa";
 
 import { findUser } from "./dataSourceHelpers.js";
 import defineUserScope from "./defineUserScope.js";
 
-const { JWT_KEY, JWT_ALGORITHM } = process.env;
+const { JWT_KEY, JWT_ALGORITHM, JWK_URL } = process.env;
+
+// =====================================================================
+// JWKS Client Initialization (with caching)
+// =====================================================================
+
+let jwksClient = null;
+
+/**
+ * Get or create JWKS client for RS256 token verification.
+ * The JWKS client is created lazily and cached for performance.
+ *
+ * @returns {JwksRsa.JwksClient|null} JWKS client instance or null if JWK_URL not configured
+ */
+const getJwksClient = () => {
+  if (!JWK_URL) {
+    return null;
+  }
+
+  if (!jwksClient) {
+    jwksClient = JwksRsa({
+      jwksUri: JWK_URL,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 10 * 60 * 1000, // 10 minutes
+      rateLimit: true,
+      jwksRequestsPerMinute: 10,
+    });
+  }
+
+  return jwksClient;
+};
+
+/**
+ * Get the signing key for token verification.
+ * Attempts to get the key from JWKS for RS256 tokens.
+ *
+ * @param {string} token - The JWT token
+ * @returns {Promise<string|Buffer>} The signing key or secret
+ */
+const getSigningKey = async (token) => {
+  try {
+    // Decode without verification to get the kid (key ID)
+    const decoded = jwt.decode(token, { complete: true });
+
+    if (!decoded) {
+      throw new Error("Invalid token format");
+    }
+
+    const { header } = decoded;
+    const alg = header?.alg;
+    const kid = header?.kid;
+
+    // HS256 tokens: use JWT_KEY (symmetric)
+    if (alg === "HS256") {
+      return JWT_KEY;
+    }
+
+    // RS256 tokens: use JWKS (asymmetric)
+    if (alg === "RS256") {
+      const client = getJwksClient();
+
+      if (!client) {
+        throw new Error(
+          "RS256 token received but JWK_URL is not configured. " +
+            "Set JWK_URL environment variable."
+        );
+      }
+
+      if (!kid) {
+        throw new Error("RS256 token missing 'kid' (key ID) in header");
+      }
+
+      const signingKey = await client.getSigningKey(kid);
+      return signingKey.getPublicKey();
+    }
+
+    // Unknown algorithm
+    throw new Error(`Unsupported token algorithm: ${alg}`);
+  } catch (err) {
+    if (err.message.includes("Unable to find a signing key")) {
+      throw new Error(
+        `JWKS key not found for kid: ${jwt.decode(token, { complete: true })?.header?.kid}`
+      );
+    }
+    throw err;
+  }
+};
 
 /**
  * Checks the authorization of the request and sets the security context.
  *
+ * Supports dual authentication:
+ * - HS256: Local JWT_KEY verification (backward compatible)
+ * - RS256: JWKS endpoint verification (Keycloak)
+ *
  * @param {Object} req - The request object.
  * @throws {Error} If the Hasura Authorization token is not provided.
  * @throws {Error} If no x-hasura-datasource-id is provided in the headers.
- * @throws {Error} If there are no permissions for the specified data source.
- * @throws {Error} If there is no default branch for the specified data source.
- * @throws {Error} If the specified data source is not found.
+ * @throws {Error} If token verification fails.
+ * @throws {Error} If the user is not found.
  * @returns {Promise<void>} A promise that resolves when the security context is set.
  */
 const checkAuth = async (req) => {
@@ -45,10 +136,27 @@ const checkAuth = async (req) => {
   }
 
   try {
-    jwtDecoded = jwt.verify(authToken, JWT_KEY, {
-      algorithms: [JWT_ALGORITHM],
+    // Detect the token algorithm first to set correct verification options
+    const decodedHeader = jwt.decode(authToken, { complete: true });
+    const tokenAlgorithm = decodedHeader?.header?.alg;
+
+    // Get the appropriate signing key based on token algorithm
+    const signingKey = await getSigningKey(authToken);
+
+    // Verify the token with appropriate algorithm
+    // For RS256 tokens, allow RS256; for HS256, allow HS256
+    const algorithms = tokenAlgorithm === "RS256" ? ["RS256"] : [JWT_ALGORITHM || "HS256"];
+
+    jwtDecoded = jwt.verify(authToken, signingKey, {
+      algorithms: algorithms,
     });
   } catch (err) {
+    // Log detailed error for debugging
+    console.error("[checkAuth] Token verification failed:", {
+      error: err.message,
+      algorithm: jwt.decode(authToken, { complete: true })?.header?.alg,
+      hasJwkUrl: !!JWK_URL,
+    });
     throw err;
   }
 

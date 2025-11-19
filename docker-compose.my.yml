@@ -44,6 +44,7 @@ services:
     build:
       context: ./services/cubejs
       dockerfile: Dockerfile.oracle
+    image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
     volumes:
@@ -59,13 +60,14 @@ services:
       - .my.env
     environment:
       CUBEJS_SCHEDULED_REFRESH: false
+      # JWK_URL is loaded from .my.env for RS256 token verification
+      JWK_URL: ${JWK_URL}
     networks:
       - synmetrix_default
 
   cubejs_refresh_worker:
-    build:
-      context: ./services/cubejs
-      dockerfile: Dockerfile.oracle
+    # reuse cubejs image
+    image: synmetrix/cubejs:dev
     restart: always
     command: yarn start.dev
     volumes:
@@ -80,6 +82,7 @@ services:
       CUBEJS_REFRESH_TIMER: 60
       CUBEJS_SCHEDULED_REFRESH: true
       CUBEJS_SQL_API: false
+      JWK_URL: ${JWK_URL}
     networks:
       - synmetrix_default
 

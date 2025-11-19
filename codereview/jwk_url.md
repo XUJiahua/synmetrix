@@ -485,6 +485,268 @@ const getDataAndScreenshot = async (exploration, authToken) => {
 
 ---
 
+### 方案 D：使用 Admin Secret 模拟用户（⚠️ 安全隐患）
+
+#### 思路
+使用 `x-hasura-admin-secret` + `x-hasura-role` + `x-hasura-user-id` 头部组合，代表指定用户向 Hasura 发送请求，绕过 JWT 验证。
+
+#### 技术原理
+
+Hasura 支持两种认证方式：
+
+1. **JWT 认证**（当前配置）
+   ```
+   Authorization: Bearer <RS256-token>
+     ↓
+   使用 JWK_URL 验证令牌
+     ↓
+   从 token payload 提取 x-hasura-user-id、x-hasura-role 等 claims
+   ```
+
+2. **Admin Secret 认证**（此方案）
+   ```
+   x-hasura-admin-secret: <HASURA_GRAPHQL_ADMIN_SECRET>
+   x-hasura-user-id: <target-user-id>           [手动设置]
+   x-hasura-role: user                          [手动设置]
+   x-hasura-allowed-roles: ["user", "admin"]   [可选]
+     ↓
+   跳过 JWT 验证，直接使用这些 headers 作为上下文
+     ↓
+   执行带有指定用户身份的查询
+   ```
+
+#### 实施方案
+
+##### 1. 修改 GraphQL 工具函数
+
+**文件**：`services/actions/src/utils/graphql.js`
+
+```javascript
+import fetch from "node-fetch";
+
+const HASURA_ENDPOINT = process.env.HASURA_ENDPOINT;
+const HASURA_GRAPHQL_ADMIN_SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
+
+export const fetchGraphQLAsUser = async (query, variables, userId, role = "user") => {
+  // 使用 admin secret + 手动设置用户身份
+  const headers = {
+    "x-hasura-admin-secret": HASURA_GRAPHQL_ADMIN_SECRET,
+    "x-hasura-user-id": userId,
+    "x-hasura-role": role,
+    "x-hasura-allowed-roles": JSON.stringify(["user"]),
+  };
+
+  const result = await fetch(HASURA_ENDPOINT, {
+    method: "POST",
+    body: JSON.stringify({
+      query,
+      variables,
+    }),
+    headers,
+  });
+
+  return parseResponse(result);
+};
+
+export const fetchGraphQL = async (query, variables, authToken) => {
+  const headers = {};
+
+  if (authToken) {
+    // JWT 认证
+    const token =
+      authToken.substring(0, 6) === "Bearer"
+        ? authToken
+        : `Bearer ${authToken}`;
+    headers.authorization = token;
+  } else {
+    // Admin secret 认证（向后兼容）
+    headers["x-hasura-admin-secret"] = HASURA_GRAPHQL_ADMIN_SECRET;
+  }
+
+  const result = await fetch(HASURA_ENDPOINT, {
+    method: "POST",
+    body: JSON.stringify({
+      query,
+      variables,
+    }),
+    headers,
+  });
+
+  return parseResponse(result);
+};
+```
+
+##### 2. 更新 RPC 方法
+
+**修改** `services/actions/src/rpc/checkAlert.js`：
+
+```javascript
+import { fetchGraphQLAsUser } from "../utils/graphql.js";
+
+// ... 原有代码 ...
+
+const checkAndTriggerAlert = async (alert) => {
+  // ...
+
+  const { user_id: userId } = alert.exploration;
+
+  // 删除原来的 generateUserAccessToken 调用
+  // 直接使用 fetchGraphQLAsUser 时会传递 userId
+
+  // 修改 fetchData 调用，传递 userId 而不是 authToken
+  let dataset = [];
+
+  try {
+    const { data } =
+      (await fetchDataWithUserContext(
+        exploration,
+        { userId },
+        userId  // ← 传递 userId
+      )) || {};
+
+    dataset = data;
+  } catch (error) {
+    await delLockData(alert);
+    throw new Error(error);
+  }
+
+  // ... 其余代码保持不变 ...
+};
+```
+
+**修改** `services/actions/src/rpc/fetchDataset.js`（需要调整）：
+
+```javascript
+export const fetchData = async (exploration, args, userId) => {
+  // 不再使用 authToken，改为 userId
+  const { playground_state: playgroundState } = exploration;
+
+  const {
+    renewQuery = true,
+    validateMeta = true,
+    format = "json",
+    limit,
+    offset,
+  } = args || {};
+
+  // 创建 Cubejs API 客户端时，生成 admin token 并手动添加用户身份头部
+  const cubejs = cubejsApiWithUserContext({
+    dataSourceId: exploration.datasource_id,
+    branchId: exploration.branch_id,
+    userId: userId,
+  });
+
+  // ... 其余代码
+};
+```
+
+**创建 Cubejs API 工具**：`services/actions/src/utils/cubejsApiWithUserContext.js`
+
+```javascript
+import cubejsClientCore from "@cubejs-client/core";
+import fetch from "node-fetch";
+
+const { CubejsApi: CubejsApiClient } = cubejsClientCore;
+const CUBEJS_URL = process.env.CUBEJS_URL || "http://cubejs:4000";
+const HASURA_GRAPHQL_ADMIN_SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
+
+const cubejsApiWithUserContext = ({ dataSourceId, branchId, userId }) => {
+  // 使用 admin secret 作为 token，但在 headers 中模拟用户身份
+  const reqHeaders = {
+    "x-hasura-admin-secret": HASURA_GRAPHQL_ADMIN_SECRET,
+    "x-hasura-user-id": userId,
+    "x-hasura-role": "user",
+    "x-hasura-datasource-id": dataSourceId,
+  };
+
+  if (branchId) {
+    reqHeaders["x-hasura-branch-id"] = branchId;
+  }
+
+  // 注意：CubejsApiClient 需要一个有效的 token，即使我们使用 admin secret
+  // 这是一个空的占位 token，因为 Cubejs 会使用 headers 中的信息
+  const fakeToken = "admin-context";
+
+  const init = new CubejsApiClient(fakeToken, {
+    apiUrl: `${CUBEJS_URL}/api/v1`,
+    headers: reqHeaders,
+  });
+
+  return {
+    meta: async () => {
+      return init.meta();
+    },
+    query: async (playgroundState, fileType = "json", args = {}) => {
+      // ... 实现
+    },
+    // ... 其他方法
+  };
+};
+
+export default cubejsApiWithUserContext;
+```
+
+#### 优点与缺点
+
+##### ✅ 优点
+- **实现简单**：仅修改 headers，无需 Keycloak 交互
+- **立即可用**：无需额外配置
+- **无外部依赖**：不需要 Token Exchange、Impersonation
+- **低延迟**：无需额外的 HTTP 请求获取令牌
+- **无缓存问题**：直接使用 userId，不涉及令牌缓存失效
+
+##### ❌ 缺点（严重）
+
+1. **安全隐患** 🔴
+   - Admin secret 被广泛用于 Actions 中，增加泄露风险
+   - 任何访问 Actions 容器或环境变量的人都能代表任意用户
+   - 没有细粒度的权限控制
+
+2. **权限检查绕过** 🔴
+   - 使用 admin secret 时，Hasura 权限检查可能被跳过
+   - `x-hasura-user-id` 是 header 中的值，可以被伪造
+   - Hasura OSS 版本对这些 headers 的验证不如 JWT 严格
+
+3. **Cubejs 兼容性问题** 🔴
+   - Cubejs `checkAuth` 强制验证 JWT 令牌
+   - 仅使用 admin secret headers 可能无法通过 Cubejs 认证
+   - 需要修改 Cubejs `checkAuth` 逻辑（高风险）
+
+4. **审计与日志困难** 🟡
+   - 所有操作看起来都是来自 admin secret
+   - 难以追踪哪个后台任务代表哪个用户执行
+   - 合规性风险（缺少用户操作审计）
+
+5. **长期维护成本高** 🟡
+   - 与 OAuth 2.0 标准不符
+   - 日后迁移或升级时需要大量改造
+   - 如果采用 Hasura Cloud，可能不兼容
+
+#### 为什么不推荐这个方案
+
+| 问题 | 影响 | 严重度 |
+|------|------|--------|
+| Admin secret 泄露 → 完全沦陷 | 整个系统被攻击 | 🔴 严重 |
+| Header 可被伪造 | 用户身份被冒充 | 🔴 严重 |
+| Cubejs 认证失败 | 后台任务无法执行 | 🔴 严重 |
+| 审计链断裂 | 无法追踪操作来源 | 🟡 中等 |
+
+---
+
+### 方案对比总结表
+
+| 维度 | 方案 A | 方案 B | 方案 C | 方案 D |
+|------|--------|--------|--------|--------|
+| **技术复杂度** | ⭐⭐⭐ 中 | ⭐ 低 | ⭐⭐⭐⭐ 高 | ⭐ 低 |
+| **安全性** | ⭐⭐⭐⭐⭐ 高 | ⭐⭐⭐⭐ 高 | ⭐⭐ 低 | 🔴 极低 |
+| **功能完整** | ✅ 完整 | ❌ 残缺 | ✅ 完整 | ✅ 完整 |
+| **Keycloak 依赖** | 🟡 有 | ✅ 无 | 🟡 有 | ✅ 无 |
+| **维护成本** | ⭐⭐⭐ 中 | ⭐ 低 | ⭐⭐⭐⭐⭐ 高 | ⭐ 低 |
+| **标准合规** | ✅ OAuth 2.0 | - | ❌ 自定义 | ❌ 自定义 |
+| **推荐度** | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐ | 🚫 不推荐 |
+
+---
+
 ## 推荐实施路径
 
 ### 第 1 阶段：准备（1-2 天）
@@ -552,14 +814,17 @@ const getDataAndScreenshot = async (exploration, authToken) => {
 
 ## 兼容性矩阵
 
-| 功能 | JWK_URL | 方案 A | 方案 B | 方案 C |
-|-----|--------|--------|--------|--------|
-| **前端用户登录** | ✅ | ✅ | ✅ | ✅ |
-| **Alert 执行** | ❌ | ✅ | ❌ | ✅ |
-| **Report 执行** | ❌ | ✅ | ❌ | ✅ |
-| **文档生成** | ⚠️ | ✅ | ❌ | ✅ |
-| **截图生成** | ❌ | ✅ | ❌ | ✅ |
-| **所有数据查询** | ✅ | ✅ | ✅ | ✅ |
+| 功能 | JWK_URL | 方案 A | 方案 B | 方案 C | 方案 D |
+|-----|--------|--------|--------|--------|--------|
+| **前端用户登录** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Alert 执行** | ❌ | ✅ | ❌ | ✅ | ⚠️ |
+| **Report 执行** | ❌ | ✅ | ❌ | ✅ | ⚠️ |
+| **文档生成** | ⚠️ | ✅ | ❌ | ✅ | ⚠️ |
+| **截图生成** | ❌ | ✅ | ❌ | ✅ | ⚠️ |
+| **所有数据查询** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **安全性评分** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | 🔴 极低 |
+
+**注**：方案 D 虽然在功能上"可以"工作，但由于严重的安全隐患，标记为 ⚠️ 而不是 ✅。
 
 ---
 
@@ -595,6 +860,161 @@ const getDataAndScreenshot = async (exploration, authToken) => {
   - 使用 secret management 工具（Vault, AWS Secrets Manager）
   - 限制环境变量访问权限
   - 定期轮换客户端密钥
+
+---
+
+## 方案 D 特定风险分析
+
+如果选择方案 D（Admin Secret + 头部模拟），请注意以下额外风险：
+
+### 🔴 Critical 级风险
+
+#### 1. Admin Secret 滥用风险
+```
+任何能访问 Actions 容器的人：
+  • 可以看到 HASURA_GRAPHQL_ADMIN_SECRET
+  • 可以伪造任意用户身份（修改 x-hasura-user-id）
+  • 可以绕过所有 Hasura 权限检查
+  • 可以读写任意用户的数据
+```
+
+**影响**：完全的权限提升，无法追踪谁做的操作
+
+#### 2. 权限绕过风险
+```
+Hasura 权限模型：
+  ✅ JWT 认证：权限来自 token payload，无法伪造
+  ❌ Admin Secret：权限来自 headers，可以伪造
+
+如果开发者犯错：
+  if (headers["x-hasura-user-id"] === targetUserId) {
+    // ❌ 这个检查被绕过了，因为 header 可以被伪造
+  }
+```
+
+#### 3. Cubejs 认证问题
+```
+Cubejs checkAuth 强制验证 JWT：
+  const jwtDecoded = jwt.verify(authToken, JWT_KEY, ...);
+
+如果使用方案 D，无法生成有效的 RS256 JWT：
+  • 无法通过 Cubejs 验证
+  • 后台任务失败
+  • 需要修改 Cubejs checkAuth（引入更多风险）
+```
+
+### 🟡 中等风险
+
+#### 4. 审计链断裂
+```
+操作日志示例：
+
+方案 A（推荐）：
+  2025-01-19 10:30:00 | alert-check | user_id=alice | action=query | source=checkAlert RPC
+  → 可清晰追踪操作来源
+
+方案 D（不推荐）：
+  2025-01-19 10:30:00 | admin-secret | x-hasura-user-id=alice | action=query | source=???
+  → 无法区分是哪个后台任务，所有操作看起来都来自 admin
+```
+
+**合规性问题**：GDPR、SOC 2 等要求完整的审计日志
+
+#### 5. 维护和升级困难
+```
+如果日后迁移到 Hasura Cloud：
+  • Hasura Cloud 不支持这种 workaround
+  • 需要重新改造整个系统
+
+如果升级 Hasura 版本：
+  • 新版本可能改变 header 处理逻辑
+  • 需要大量测试和回归修复
+```
+
+### 实际场景分析
+
+#### 场景 1：恶意内部人员
+
+```javascript
+// 在 Actions 中读取 admin secret
+const secret = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
+
+// 代表任意用户查询敏感数据
+const query = `{
+  users { email password phone_number }  // 窃取所有用户信息
+}`;
+
+// 使用伪造的身份发送查询
+const headers = {
+  "x-hasura-admin-secret": secret,
+  "x-hasura-user-id": "victim-user-id",  // 伪造身份
+  "x-hasura-role": "admin",
+};
+
+// Hasura 完全接受这个请求 ❌
+```
+
+#### 场景 2：容器被入侵
+
+```
+攻击者入侵 Actions 容器：
+  1. 读取环境变量 → 获得 HASURA_GRAPHQL_ADMIN_SECRET
+  2. 连接到 Hasura 和 Cubejs
+  3. 代表任意用户执行任意操作
+  4. 修改数据库中的数据
+  5. 无法通过日志追踪（所有操作都来自 admin）
+```
+
+**防护**：需要网络隔离、RBAC、审计日志、入侵检测等多层防护
+
+#### 场景 3：测试/开发泄露
+
+```
+开发者在调试时：
+  const userId = "admin";  // 测试用 hardcoded 用户ID
+
+这段代码进入生产：
+  所有后台任务都代表 "admin" 用户执行
+  权限被意外提升
+  难以发现这个 bug
+```
+
+---
+
+## 方案对比：安全性深度分析
+
+### 方案 A vs 方案 D 的关键区别
+
+| 维度 | 方案 A | 方案 D |
+|------|--------|--------|
+| **令牌来源** | Keycloak JWKS 签发 | 手动 header 伪造 |
+| **验证机制** | 密码学签名验证 | 字符串匹配（易伪造） |
+| **权限隔离** | 每个用户一个令牌 | 共用 admin secret |
+| **审计追踪** | 清晰（token payload） | 混乱（无法区分） |
+| **攻击面** | Keycloak（专业 IdP） | Admin secret（裸露） |
+| **满足合规** | ✅ GDPR/SOC 2 | ❌ |
+
+### 安全评分（CVSS 类比）
+
+```
+方案 A：  ■□□□□□□□□□ (0.0 - 完全符合 OAuth 2.0)
+方案 D：  ■■■■■■■■■■ (9.8 - 严重缺陷)
+```
+
+---
+
+## 决策树
+
+```
+你需要后台任务工作吗?
+├─ 否 → 使用方案 B（禁用后台任务）
+└─ 是 → 你愿意投入多少资源?
+   ├─ 低（<1 周）→ ❌ 不要用方案 D！即使看起来"快速"
+   ├─ 中（1-2 周）→ ✅ 使用方案 A（推荐）
+   │            └─ 需要 Keycloak Token Exchange 配置
+   └─ 高（>2 周）→ 方案 C（企业特性，不推荐）
+                └─ 需要 Hasura 企业版
+```
 
 ---
 
@@ -782,5 +1202,6 @@ A: 可以使用 `curl` 手动测试（见调试指南）或创建集成测试调
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
+| 2025-01-19 | 1.1 | 添加方案 D - Admin Secret 模拟用户方案（⚠️ 不推荐，安全隐患严重） |
 | 2025-01-19 | 1.0 | 初稿 - 方案 A（推荐）完整实施指南 |
 
