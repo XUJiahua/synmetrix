@@ -2,7 +2,7 @@
 
 ## 执行摘要
 
-当前 **Cubejs 不支持 JWK_URL** 认证，仍然使用本地 HS256 验证。这与 Keycloak 配置的 JWK_URL (RS256) 完全不兼容，导致：
+当前 **Cubejs 不支持 JWK_URL** 认证，仍然使用本地 HS256 验证（报错信息：JsonWebTokenError: invalid algorithm）。这与 Keycloak 配置的 JWK_URL (RS256) 完全不兼容，导致：
 
 - ❌ 前端用户无法使用 Keycloak RS256 token 访问 Cubejs
 - ❌ 后台任务无法执行数据查询
