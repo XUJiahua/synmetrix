@@ -4,7 +4,7 @@ import JwksRsa from "jwks-rsa";
 import { findUser } from "./dataSourceHelpers.js";
 import defineUserScope from "./defineUserScope.js";
 
-const { JWT_KEY, JWT_ALGORITHM, JWK_URL } = process.env;
+const { JWT_KEY, JWT_ALGORITHM, JWK_URL, JWT_CLAIMS_NAMESPACE } = process.env;
 
 // =====================================================================
 // JWKS Client Initialization (with caching)
@@ -160,7 +160,24 @@ const checkAuth = async (req) => {
     throw err;
   }
 
-  const { "x-hasura-user-id": userId } = jwtDecoded?.hasura || {};
+  // Support both JWT_CLAIMS_NAMESPACE and fallback to 'hasura' for backward compatibility
+  const claimsNamespace = JWT_CLAIMS_NAMESPACE || "hasura";
+  const { "x-hasura-user-id": userId } = jwtDecoded?.[claimsNamespace] || {};
+
+  console.log("[checkAuth] JWT Claims Debug:", {
+    claimsNamespace,
+    jwtDecodedKeys: Object.keys(jwtDecoded || {}),
+    claimsValue: jwtDecoded?.[claimsNamespace],
+    userId,
+  });
+
+  if (!userId) {
+    throw new Error(
+      `401: Failed to extract user ID from JWT claims. ` +
+        `Using namespace "${claimsNamespace}". ` +
+        `JWT payload: ${JSON.stringify(jwtDecoded)}`
+    );
+  }
 
   if (!dataSourceId) {
     throw new Error(

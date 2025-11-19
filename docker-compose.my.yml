@@ -60,6 +60,7 @@ services:
       - .my.env
     environment:
       CUBEJS_SCHEDULED_REFRESH: false
+      JWT_CLAIMS_NAMESPACE: ${JWT_CLAIMS_NAMESPACE}
       # JWK_URL is loaded from .my.env for RS256 token verification
       JWK_URL: ${JWK_URL}
     networks:
