@@ -13,12 +13,27 @@ import (
 	"time"
 )
 
+// AuthMethod represents the authentication method
+type AuthMethod string
+
+const (
+	AuthMethodClientCredentials AuthMethod = "client_credentials"
+	AuthMethodPassword          AuthMethod = "password"
+)
+
 // Client handles communication with Keycloak Admin API
 type Client struct {
 	baseURL      string
 	realm        string
 	clientID     string
 	clientSecret string
+
+	// Admin user credentials (for password grant type)
+	adminUsername string
+	adminPassword string
+
+	// Authentication method
+	authMethod AuthMethod
 
 	// Token management
 	accessToken string
@@ -28,13 +43,42 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient creates a new Keycloak client
+// NewClient creates a new Keycloak client based on the configuration
+// It automatically selects the appropriate authentication method:
+// - If admin username/password are provided, uses password grant
+// - Otherwise, uses client credentials (service account)
 func NewClient(cfg *config.Config) *Client {
+	client := &Client{
+		baseURL:  cfg.KeycloakURL,
+		realm:    cfg.KeycloakRealm,
+		clientID: cfg.KeycloakClientID,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+
+	// Choose authentication method based on available credentials
+	if cfg.UseAdminUserAuth() {
+		client.authMethod = AuthMethodPassword
+		client.adminUsername = cfg.KeycloakAdminUsername
+		client.adminPassword = cfg.KeycloakAdminPassword
+	} else {
+		client.authMethod = AuthMethodClientCredentials
+		client.clientSecret = cfg.KeycloakClientSecret
+	}
+
+	return client
+}
+
+// NewClientWithAdminUser creates a new Keycloak client using admin username and password
+func NewClientWithAdminUser(baseURL, realm, clientID, adminUsername, adminPassword string) *Client {
 	return &Client{
-		baseURL:      cfg.KeycloakURL,
-		realm:        cfg.KeycloakRealm,
-		clientID:     cfg.KeycloakClientID,
-		clientSecret: cfg.KeycloakClientSecret,
+		baseURL:       baseURL,
+		realm:         realm,
+		clientID:      clientID,
+		adminUsername: adminUsername,
+		adminPassword: adminPassword,
+		authMethod:    AuthMethodPassword,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -104,14 +148,25 @@ func (c *Client) ensureAuthenticated(ctx context.Context) error {
 	return c.authenticate(ctx)
 }
 
-// authenticate obtains a new access token using client credentials
+// authenticate obtains a new access token using the configured auth method
 func (c *Client) authenticate(ctx context.Context) error {
 	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", c.baseURL, c.realm)
 
 	data := url.Values{}
-	data.Set("grant_type", "client_credentials")
-	data.Set("client_id", c.clientID)
-	data.Set("client_secret", c.clientSecret)
+
+	switch c.authMethod {
+	case AuthMethodClientCredentials:
+		data.Set("grant_type", "client_credentials")
+		data.Set("client_id", c.clientID)
+		data.Set("client_secret", c.clientSecret)
+	case AuthMethodPassword:
+		data.Set("grant_type", "password")
+		data.Set("client_id", c.clientID)
+		data.Set("username", c.adminUsername)
+		data.Set("password", c.adminPassword)
+	default:
+		return errors.New(errors.ErrCodeKeycloakAuth, fmt.Sprintf("unsupported auth method: %s", c.authMethod))
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {

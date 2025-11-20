@@ -18,6 +18,10 @@ type Config struct {
 	KeycloakClientID     string
 	KeycloakClientSecret string
 
+	// Keycloak admin user credentials (alternative to client credentials)
+	KeycloakAdminUsername string
+	KeycloakAdminPassword string
+
 	// Hasura configuration
 	HasuraEndpoint    string
 	HasuraAdminSecret string
@@ -33,15 +37,17 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		ServerPort:           getEnv("SERVER_PORT", "3000"),
-		KeycloakURL:          getEnv("KEYCLOAK_URL", ""),
-		KeycloakRealm:        getEnv("KEYCLOAK_REALM", ""),
-		KeycloakClientID:     getEnv("KEYCLOAK_CLIENT_ID", ""),
-		KeycloakClientSecret: getEnv("KEYCLOAK_CLIENT_SECRET", ""),
-		HasuraEndpoint:       getEnv("HASURA_ENDPOINT", ""),
-		HasuraAdminSecret:    getEnv("HASURA_ADMIN_SECRET", ""),
-		JWTSecret:            getEnv("JWT_SECRET", ""),
-		JWTClaimsNamespace:   getEnv("JWT_CLAIMS_NAMESPACE", "https://hasura.io/jwt/claims"),
+		ServerPort:            getEnv("SERVER_PORT", "3000"),
+		KeycloakURL:           getEnv("KEYCLOAK_URL", ""),
+		KeycloakRealm:         getEnv("KEYCLOAK_REALM", ""),
+		KeycloakClientID:      getEnv("KEYCLOAK_CLIENT_ID", ""),
+		KeycloakClientSecret:  getEnv("KEYCLOAK_CLIENT_SECRET", ""),
+		KeycloakAdminUsername: getEnv("KEYCLOAK_ADMIN_USERNAME", ""),
+		KeycloakAdminPassword: getEnv("KEYCLOAK_ADMIN_PASSWORD", ""),
+		HasuraEndpoint:        getEnv("HASURA_ENDPOINT", ""),
+		HasuraAdminSecret:     getEnv("HASURA_ADMIN_SECRET", ""),
+		JWTSecret:             getEnv("JWT_SECRET", ""),
+		JWTClaimsNamespace:    getEnv("JWT_CLAIMS_NAMESPACE", "https://hasura.io/jwt/claims"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -62,9 +68,15 @@ func (c *Config) Validate() error {
 	if c.KeycloakClientID == "" {
 		return fmt.Errorf("KEYCLOAK_CLIENT_ID is required")
 	}
-	if c.KeycloakClientSecret == "" {
-		return fmt.Errorf("KEYCLOAK_CLIENT_SECRET is required")
+
+	// Validate Keycloak authentication: must have either client credentials OR admin user credentials
+	hasClientCredentials := c.KeycloakClientSecret != ""
+	hasAdminCredentials := c.KeycloakAdminUsername != "" && c.KeycloakAdminPassword != ""
+
+	if !hasClientCredentials && !hasAdminCredentials {
+		return fmt.Errorf("KEYCLOAK_CLIENT_SECRET or (KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD) is required")
 	}
+
 	if c.HasuraEndpoint == "" {
 		return fmt.Errorf("HASURA_ENDPOINT is required")
 	}
@@ -72,6 +84,11 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("HASURA_ADMIN_SECRET is required")
 	}
 	return nil
+}
+
+// UseAdminUserAuth returns true if admin user authentication should be used
+func (c *Config) UseAdminUserAuth() bool {
+	return c.KeycloakAdminUsername != "" && c.KeycloakAdminPassword != ""
 }
 
 // getEnv gets an environment variable or returns a default value

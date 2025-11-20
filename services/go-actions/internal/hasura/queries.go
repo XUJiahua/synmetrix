@@ -26,6 +26,7 @@ const (
 		}
 	`
 
+	// reference: https://github.com/nhost/hasura-backend-plus/blob/master/src/shared/queries.ts
 	// CreateUserMutation creates a new user (without account)
 	CreateUserMutation = `
 		mutation CreateUser($id: uuid!, $display_name: String!) {

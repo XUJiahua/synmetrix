@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TestNewClient tests the client creation
+// TestNewClient tests the client creation with client credentials
 func TestNewClient(t *testing.T) {
 	cfg := &config.Config{
 		KeycloakURL:          "http://localhost:8082",
@@ -41,6 +41,10 @@ func TestNewClient(t *testing.T) {
 		t.Errorf("Expected clientSecret %s, got %s", cfg.KeycloakClientSecret, client.clientSecret)
 	}
 
+	if client.authMethod != AuthMethodClientCredentials {
+		t.Errorf("Expected authMethod %s, got %s", AuthMethodClientCredentials, client.authMethod)
+	}
+
 	if client.httpClient == nil {
 		t.Error("httpClient should not be nil")
 	}
@@ -50,7 +54,134 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-// TestAuthenticate tests the authentication flow with mock server
+// TestNewClientWithConfigAdminUser tests the client creation from config with admin user credentials
+func TestNewClientWithConfigAdminUser(t *testing.T) {
+	cfg := &config.Config{
+		KeycloakURL:           "http://localhost:8082",
+		KeycloakRealm:         "master",
+		KeycloakClientID:      "admin-cli",
+		KeycloakAdminUsername: "admin",
+		KeycloakAdminPassword: "admin-password",
+	}
+
+	client := NewClient(cfg)
+
+	if client == nil {
+		t.Fatal("NewClient returned nil")
+	}
+
+	if client.baseURL != cfg.KeycloakURL {
+		t.Errorf("Expected baseURL %s, got %s", cfg.KeycloakURL, client.baseURL)
+	}
+
+	if client.realm != cfg.KeycloakRealm {
+		t.Errorf("Expected realm %s, got %s", cfg.KeycloakRealm, client.realm)
+	}
+
+	if client.clientID != cfg.KeycloakClientID {
+		t.Errorf("Expected clientID %s, got %s", cfg.KeycloakClientID, client.clientID)
+	}
+
+	if client.adminUsername != cfg.KeycloakAdminUsername {
+		t.Errorf("Expected adminUsername %s, got %s", cfg.KeycloakAdminUsername, client.adminUsername)
+	}
+
+	if client.adminPassword != cfg.KeycloakAdminPassword {
+		t.Errorf("Expected adminPassword %s, got %s", cfg.KeycloakAdminPassword, client.adminPassword)
+	}
+
+	if client.authMethod != AuthMethodPassword {
+		t.Errorf("Expected authMethod %s, got %s", AuthMethodPassword, client.authMethod)
+	}
+
+	if client.httpClient == nil {
+		t.Error("httpClient should not be nil")
+	}
+
+	if client.httpClient.Timeout != 30*time.Second {
+		t.Errorf("Expected timeout 30s, got %s", client.httpClient.Timeout)
+	}
+}
+
+// TestNewClientWithConfigBothCredentials tests that admin user takes precedence when both are provided
+func TestNewClientWithConfigBothCredentials(t *testing.T) {
+	cfg := &config.Config{
+		KeycloakURL:           "http://localhost:8082",
+		KeycloakRealm:         "master",
+		KeycloakClientID:      "admin-cli",
+		KeycloakClientSecret:  "test-secret",
+		KeycloakAdminUsername: "admin",
+		KeycloakAdminPassword: "admin-password",
+	}
+
+	client := NewClient(cfg)
+
+	if client == nil {
+		t.Fatal("NewClient returned nil")
+	}
+
+	// Admin user should take precedence
+	if client.authMethod != AuthMethodPassword {
+		t.Errorf("Expected authMethod %s (admin user should take precedence), got %s", AuthMethodPassword, client.authMethod)
+	}
+
+	if client.adminUsername != cfg.KeycloakAdminUsername {
+		t.Errorf("Expected adminUsername %s, got %s", cfg.KeycloakAdminUsername, client.adminUsername)
+	}
+
+	if client.adminPassword != cfg.KeycloakAdminPassword {
+		t.Errorf("Expected adminPassword %s, got %s", cfg.KeycloakAdminPassword, client.adminPassword)
+	}
+}
+
+// TestNewClientWithAdminUser tests the client creation with admin user credentials
+func TestNewClientWithAdminUser(t *testing.T) {
+	client := NewClientWithAdminUser(
+		"http://localhost:8082",
+		"master",
+		"admin-cli",
+		"admin",
+		"admin-password",
+	)
+
+	if client == nil {
+		t.Fatal("NewClientWithAdminUser returned nil")
+	}
+
+	if client.baseURL != "http://localhost:8082" {
+		t.Errorf("Expected baseURL http://localhost:8082, got %s", client.baseURL)
+	}
+
+	if client.realm != "master" {
+		t.Errorf("Expected realm master, got %s", client.realm)
+	}
+
+	if client.clientID != "admin-cli" {
+		t.Errorf("Expected clientID admin-cli, got %s", client.clientID)
+	}
+
+	if client.adminUsername != "admin" {
+		t.Errorf("Expected adminUsername admin, got %s", client.adminUsername)
+	}
+
+	if client.adminPassword != "admin-password" {
+		t.Errorf("Expected adminPassword admin-password, got %s", client.adminPassword)
+	}
+
+	if client.authMethod != AuthMethodPassword {
+		t.Errorf("Expected authMethod %s, got %s", AuthMethodPassword, client.authMethod)
+	}
+
+	if client.httpClient == nil {
+		t.Error("httpClient should not be nil")
+	}
+
+	if client.httpClient.Timeout != 30*time.Second {
+		t.Errorf("Expected timeout 30s, got %s", client.httpClient.Timeout)
+	}
+}
+
+// TestAuthenticate tests the authentication flow with mock server (client credentials)
 func TestAuthenticate(t *testing.T) {
 	// Create mock server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +236,82 @@ func TestAuthenticate(t *testing.T) {
 
 	if client.accessToken != "test-token-12345" {
 		t.Errorf("Expected access token 'test-token-12345', got '%s'", client.accessToken)
+	}
+
+	if client.tokenExpiry.IsZero() {
+		t.Error("Token expiry should be set")
+	}
+
+	// Token should expire approximately 1 hour from now
+	expectedExpiry := time.Now().Add(3600 * time.Second)
+	diff := client.tokenExpiry.Sub(expectedExpiry)
+	if diff > 5*time.Second || diff < -5*time.Second {
+		t.Errorf("Token expiry time difference too large: %v", diff)
+	}
+}
+
+// TestAuthenticateWithPassword tests the authentication flow with password grant type
+func TestAuthenticateWithPassword(t *testing.T) {
+	// Create mock server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/realms/master/protocol/openid-connect/token" {
+			if r.Method != "POST" {
+				t.Errorf("Expected POST request, got %s", r.Method)
+			}
+
+			if err := r.ParseForm(); err != nil {
+				t.Errorf("Failed to parse form: %v", err)
+			}
+
+			if r.Form.Get("grant_type") != "password" {
+				t.Errorf("Expected grant_type=password, got %s", r.Form.Get("grant_type"))
+			}
+
+			if r.Form.Get("client_id") != "admin-cli" {
+				t.Errorf("Expected client_id=admin-cli, got %s", r.Form.Get("client_id"))
+			}
+
+			if r.Form.Get("username") != "admin" {
+				t.Errorf("Expected username=admin, got %s", r.Form.Get("username"))
+			}
+
+			if r.Form.Get("password") != "admin-password" {
+				t.Errorf("Expected password=admin-password, got %s", r.Form.Get("password"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"access_token": "test-admin-token-67890",
+				"expires_in": 3600,
+				"refresh_expires_in": 0,
+				"token_type": "Bearer"
+			}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer mockServer.Close()
+
+	client := NewClientWithAdminUser(
+		mockServer.URL,
+		"master",
+		"admin-cli",
+		"admin",
+		"admin-password",
+	)
+	ctx := context.Background()
+
+	err := client.authenticate(ctx)
+	if err != nil {
+		t.Fatalf("authenticate() with password failed: %v", err)
+	}
+
+	client.mu.RLock()
+	defer client.mu.RUnlock()
+
+	if client.accessToken != "test-admin-token-67890" {
+		t.Errorf("Expected access token 'test-admin-token-67890', got '%s'", client.accessToken)
 	}
 
 	if client.tokenExpiry.IsZero() {
