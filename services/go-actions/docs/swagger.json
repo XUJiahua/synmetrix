@@ -1,0 +1,180 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for just-in-time user synchronization between Keycloak and Hasura",
+        "title": "Go Actions - Keycloak JIT User Sync API",
+        "contact": {
+            "name": "Synmetrix Team",
+            "url": "https://github.com/synmetrix/synmetrix"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:3000",
+    "basePath": "/",
+    "paths": {
+        "/ensure-user": {
+            "post": {
+                "description": "JIT user synchronization - creates user in Hasura if not exists, fetching data from Keycloak",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Ensure user exists (Hasura Action)",
+                "parameters": [
+                    {
+                        "description": "Hasura Action Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.HasuraActionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HasuraActionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the service is running",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HealthResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Error code (optional)",
+                    "type": "string",
+                    "example": "INVALID_REQUEST"
+                },
+                "message": {
+                    "description": "Error message",
+                    "type": "string",
+                    "example": "invalid request body"
+                }
+            }
+        },
+        "handler.HasuraActionRequest": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "description": "Action name",
+                            "type": "string",
+                            "example": "ensure_user_exists"
+                        }
+                    }
+                },
+                "input": {
+                    "description": "Action input parameters (optional)",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "session_variables": {
+                    "description": "Session variables from Hasura JWT",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "example": {
+                        "x-hasura-user-id": "uuid-here"
+                    }
+                }
+            }
+        },
+        "handler.HasuraActionResponse": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "description": "User avatar URL (optional)",
+                    "type": "string",
+                    "example": "https://example.com/avatar.jpg"
+                },
+                "display_name": {
+                    "description": "User display name",
+                    "type": "string",
+                    "example": "John Doe"
+                },
+                "email": {
+                    "description": "User email",
+                    "type": "string",
+                    "example": "john.doe@example.com"
+                },
+                "id": {
+                    "description": "User UUID",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "handler.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "service": {
+                    "description": "Service name",
+                    "type": "string",
+                    "example": "go-actions"
+                },
+                "status": {
+                    "description": "Service status",
+                    "type": "string",
+                    "example": "ok"
+                },
+                "version": {
+                    "description": "Service version",
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        }
+    }
+}

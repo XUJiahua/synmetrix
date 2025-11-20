@@ -1,0 +1,43 @@
+# Binaries
+go-actions
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+# Swagger docs (generated)
+# Note: Keep docs/ directory but could ignore if regenerated each build
+# docs/docs.go
+# docs/swagger.json
+# docs/swagger.yaml

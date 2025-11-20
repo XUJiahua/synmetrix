@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+keycloak-jit-sync.md
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development files
+.vscode
+.idea
+
+# Build artifacts
+go-actions
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+testdata/
+
+# Temporary files
+tmp/
+temp/

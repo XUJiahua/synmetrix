@@ -1,0 +1,126 @@
+basePath: /
+definitions:
+  handler.ErrorResponse:
+    properties:
+      code:
+        description: Error code (optional)
+        example: INVALID_REQUEST
+        type: string
+      message:
+        description: Error message
+        example: invalid request body
+        type: string
+    type: object
+  handler.HasuraActionRequest:
+    properties:
+      action:
+        properties:
+          name:
+            description: Action name
+            example: ensure_user_exists
+            type: string
+        type: object
+      input:
+        additionalProperties: true
+        description: Action input parameters (optional)
+        type: object
+      session_variables:
+        additionalProperties:
+          type: string
+        description: Session variables from Hasura JWT
+        example:
+          x-hasura-user-id: uuid-here
+        type: object
+    type: object
+  handler.HasuraActionResponse:
+    properties:
+      avatar_url:
+        description: User avatar URL (optional)
+        example: https://example.com/avatar.jpg
+        type: string
+      display_name:
+        description: User display name
+        example: John Doe
+        type: string
+      email:
+        description: User email
+        example: john.doe@example.com
+        type: string
+      id:
+        description: User UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  handler.HealthResponse:
+    properties:
+      service:
+        description: Service name
+        example: go-actions
+        type: string
+      status:
+        description: Service status
+        example: ok
+        type: string
+      version:
+        description: Service version
+        example: 1.0.0
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact:
+    name: Synmetrix Team
+    url: https://github.com/synmetrix/synmetrix
+  description: API for just-in-time user synchronization between Keycloak and Hasura
+  title: Go Actions - Keycloak JIT User Sync API
+  version: 1.0.0
+paths:
+  /ensure-user:
+    post:
+      consumes:
+      - application/json
+      description: JIT user synchronization - creates user in Hasura if not exists,
+        fetching data from Keycloak
+      parameters:
+      - description: Hasura Action Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.HasuraActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HasuraActionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Ensure user exists (Hasura Action)
+      tags:
+      - users
+  /health:
+    get:
+      description: Check if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+swagger: "2.0"
