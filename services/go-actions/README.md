@@ -75,6 +75,7 @@ services/go-actions/
 ├── INTEGRATION.md         # Hasura integration guide
 ├── ADDING_NEW_ACTION.md   # Guide for adding new actions
 ├── SWAGGER_GUIDE.md       # Swagger documentation guide
+├── SECURITY_GUIDE.md      # Security and permission control guide
 ├── MIGRATION_TO_RPC.md    # RPC architecture migration docs
 └── TODO.md                # Hasura Actions spec and security notes
 ```
@@ -304,6 +305,39 @@ CREATE TABLE member_roles (
   member_id UUID REFERENCES members(id),
   team_role TEXT NOT NULL
 );
+```
+
+## Security
+
+### ⚠️ Important Security Notes
+
+This service handles Hasura Actions and requires proper security configuration:
+
+**Current Status**:
+- ✅ Session Variables validation
+- ✅ Network isolation (Docker internal)
+- ⚠️ **Action Secret NOT configured by default**
+
+**Required for Production**:
+1. **Configure Action Secret** - Verify requests come from Hasura
+2. **Enable HTTPS/TLS** - Encrypt all communications
+3. **Network Isolation** - Keep service in private network
+4. **Audit Logging** - Track all sensitive operations
+
+See [SECURITY_GUIDE.md](SECURITY_GUIDE.md) for comprehensive security strategies and implementation guide.
+
+### Quick Security Setup
+
+```bash
+# 1. Generate a strong action secret
+ACTION_SECRET=$(openssl rand -hex 32)
+
+# 2. Add to .env
+echo "ACTION_SECRET=$ACTION_SECRET" >> .env
+
+# 3. Configure in Hasura metadata (see SECURITY_GUIDE.md)
+
+# 4. Enable middleware in go-actions (see code examples in SECURITY_GUIDE.md)
 ```
 
 ## Usage
