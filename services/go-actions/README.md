@@ -8,6 +8,7 @@ This service handles automatic user creation in Hasura when users first log in v
 
 ### Features
 
+- ✅ **RPC Architecture**: Extensible RPC-style routing for multiple Hasura Actions
 - ✅ **JIT User Sync**: Automatically creates users on first login
 - ✅ **Keycloak Integration**: Fetches user data from Keycloak Admin API
 - ✅ **Hasura GraphQL**: Stores user data directly in Hasura via GraphQL
@@ -55,7 +56,10 @@ services/go-actions/
 │   ├── config/            # Configuration management
 │   ├── keycloak/          # Keycloak Admin Client
 │   ├── hasura/            # Hasura GraphQL Client
-│   ├── handler/           # HTTP handlers (Gin)
+│   ├── handler/           # Common handler types
+│   ├── rpc/               # RPC action handlers
+│   │   ├── router.go      # RPC router
+│   │   └── ensure_user.go # User sync action
 │   └── service/           # Business logic
 ├── pkg/                   # Public packages
 │   ├── logger/            # Structured logging
@@ -67,7 +71,12 @@ services/go-actions/
 ├── main.go                # Entry point
 ├── Dockerfile             # Docker build
 ├── Makefile               # Build automation
-└── README.md              # This file
+├── README.md              # This file
+├── INTEGRATION.md         # Hasura integration guide
+├── ADDING_NEW_ACTION.md   # Guide for adding new actions
+├── SWAGGER_GUIDE.md       # Swagger documentation guide
+├── MIGRATION_TO_RPC.md    # RPC architecture migration docs
+└── TODO.md                # Hasura Actions spec and security notes
 ```
 
 ## Prerequisites
@@ -182,9 +191,12 @@ services:
 
 ## API Endpoints
 
-### POST /ensure-user
+### POST /rpc/:method
 
-Hasura Action handler for user synchronization.
+RPC-style endpoint for handling Hasura Actions.
+
+**Available Methods**:
+- `ensure_user` - JIT user synchronization
 
 **Request** (from Hasura):
 ```json
@@ -208,6 +220,8 @@ Hasura Action handler for user synchronization.
   "email": "john@example.com"
 }
 ```
+
+**Adding New Actions**: See [ADDING_NEW_ACTION.md](ADDING_NEW_ACTION.md) for a complete guide.
 
 ### GET /health
 
@@ -233,6 +247,9 @@ The Swagger documentation provides:
 - Request/response examples
 - Schema definitions
 - Try-it-out functionality
+- **Individual documentation for each RPC action**
+
+Each action has its own documented endpoint with specific input/output schemas. See [SWAGGER_GUIDE.md](SWAGGER_GUIDE.md) for details on how to add Swagger documentation for new actions.
 
 ## Hasura Integration
 
@@ -244,11 +261,13 @@ Create a Hasura Action in `hasura/metadata/actions.yaml`:
 - name: ensure_user_exists
   definition:
     kind: synchronous
-    handler: http://go-actions:3000/ensure-user
+    handler: http://go-actions:3000/rpc/ensure_user
     forward_client_headers: true
   permissions:
     - role: user
 ```
+
+For complete integration instructions, see [INTEGRATION.md](INTEGRATION.md).
 
 ### GraphQL Schema
 

@@ -2,6 +2,29 @@
 
 本文档介绍如何将 go-actions 服务集成到 Hasura 中，实现 JIT 用户同步功能。
 
+## RPC 架构说明
+
+go-actions 服务采用 RPC 风格的路由架构，所有 Hasura Actions 都通过统一的 `/rpc/:method` 端点处理。
+
+### 架构优势
+
+1. **可扩展性**: 添加新的 action 只需注册新的 handler，无需修改路由配置
+2. **一致性**: 所有 actions 遵循相同的请求/响应格式
+3. **灵活性**: 支持连字符和下划线命名（`ensure-user` 和 `ensure_user` 都可用）
+4. **易维护**: 类似于 Node.js actions 服务的实现模式
+
+### 当前可用的 Actions
+
+| Method Name | Endpoint | 描述 |
+|------------|----------|------|
+| `ensure_user` | `/rpc/ensure_user` | JIT 用户同步 |
+
+### 添加新的 Action
+
+要添加新的 action，只需在 `internal/rpc/` 目录下创建新的 handler 文件，实现 `ActionHandler` 接口，然后在 `cmd/serve.go` 中注册即可。
+
+参考示例：`internal/rpc/ensure_user.go`
+
 ## 前置条件
 
 1. **Keycloak Service Account 已配置**
@@ -51,7 +74,7 @@ type EnsureUserOutput {
 ```
 
 **Handler 配置**:
-- Handler URL: `http://go-actions:3000/ensure-user`
+- Handler URL: `http://go-actions:3000/rpc/ensure_user`
 - Forward client headers: ✅ 启用
 
 **方法 B: 使用 Metadata 文件**
@@ -63,7 +86,7 @@ actions:
   - name: ensure_user_exists
     definition:
       kind: synchronous
-      handler: http://go-actions:3000/ensure-user
+      handler: http://go-actions:3000/rpc/ensure_user
       forward_client_headers: true
     permissions:
       - role: user

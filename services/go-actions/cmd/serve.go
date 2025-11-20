@@ -13,6 +13,7 @@ import (
 	"go-actions/internal/handler"
 	"go-actions/internal/hasura"
 	"go-actions/internal/keycloak"
+	"go-actions/internal/rpc"
 	"go-actions/internal/service"
 	"go-actions/pkg/logger"
 
@@ -32,7 +33,7 @@ var serveCmd = &cobra.Command{
 user synchronization between Keycloak and Hasura.
 
 The server exposes the following endpoints:
-  - POST /ensure-user: Hasura Action handler for user sync
+  - POST /rpc/:method: RPC-style action handlers (e.g., /rpc/ensure_user)
   - GET  /health: Health check endpoint
   - GET  /swagger/*: Swagger API documentation`,
 	RunE: runServe,
@@ -83,12 +84,21 @@ func runServe(cmd *cobra.Command, args []string) error {
 	router.Use(ginLogger(log))
 	router.Use(gin.Recovery())
 
-	// 7. Setup routes
-	ensureUserHandler := handler.NewEnsureUserHandler(userSyncService, log)
+	// 7. Setup RPC router and register action handlers
+	rpcRouter := rpc.NewRouter(log)
 
-	// Hasura Action endpoint
-	router.POST("/ensure-user", ensureUserHandler.EnsureUser)
-	log.Info("Registered POST /ensure-user endpoint")
+	// Register ensure_user action
+	ensureUserHandler := rpc.NewEnsureUserHandler(userSyncService, log)
+	rpcRouter.Register("ensure_user", ensureUserHandler)
+
+	// RPC endpoint - handles all actions via /rpc/:method
+	router.POST("/rpc/:method", rpcRouter.Handle)
+	log.Info("Registered POST /rpc/:method endpoint")
+
+	// Additional explicit routes for Swagger documentation
+	// These are the same handlers but with specific paths for better Swagger docs
+	router.POST("/rpc/ensure_user", ensureUserSwagger(ensureUserHandler))
+	log.Info("Registered POST /rpc/ensure_user endpoint (Swagger)")
 
 	// Health check endpoint
 	router.GET("/health", healthCheck)
@@ -171,6 +181,22 @@ func ginLogger(log *logger.Logger) gin.HandlerFunc {
 			clientIP,
 		)
 	}
+}
+
+// ensureUserSwagger godoc
+// @Summary      Ensure user exists (JIT User Sync)
+// @Description  Just-in-time user synchronization - creates user in Hasura if not exists, fetching data from Keycloak
+// @Tags         actions
+// @Accept       json
+// @Produce      json
+// @Param        request body handler.HasuraActionRequest true "Hasura Action Request with session_variables"
+// @Success      200 {object} handler.HasuraActionResponse "User data (id, display_name, email, avatar_url)"
+// @Failure      400 {object} handler.ErrorResponse "Invalid request body"
+// @Failure      401 {object} handler.ErrorResponse "Missing or invalid user ID in session"
+// @Failure      500 {object} handler.ErrorResponse "Failed to sync user from Keycloak"
+// @Router       /rpc/ensure_user [post]
+func ensureUserSwagger(h *rpc.EnsureUserHandler) gin.HandlerFunc {
+	return h.Handle
 }
 
 // healthCheck godoc

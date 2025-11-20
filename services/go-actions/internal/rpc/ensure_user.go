@@ -1,15 +1,16 @@
-package handler
+package rpc
 
 import (
 	"net/http"
 
+	"go-actions/internal/handler"
 	"go-actions/internal/service"
 	"go-actions/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )
 
-// EnsureUserHandler handles the ensure_user_exists action
+// EnsureUserHandler handles the ensure_user action
 type EnsureUserHandler struct {
 	userSyncService *service.UserSyncService
 	logger          *logger.Logger
@@ -26,9 +27,10 @@ func NewEnsureUserHandler(
 	}
 }
 
-func (h *EnsureUserHandler) EnsureUser(c *gin.Context) {
+// Handle implements the ActionHandler interface
+func (h *EnsureUserHandler) Handle(c *gin.Context) {
 	// Parse request body
-	var req HasuraActionRequest
+	var req handler.HasuraActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Errorf("Failed to decode request: %v", err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
@@ -49,7 +51,7 @@ func (h *EnsureUserHandler) EnsureUser(c *gin.Context) {
 		return
 	}
 
-	h.logger.Infof("Processing ensure_user_exists for user: %s", userID)
+	h.logger.Infof("Processing ensure_user for user: %s", userID)
 
 	// Call the user sync service
 	userData, err := h.userSyncService.EnsureUserExists(c.Request.Context(), userID)
@@ -63,7 +65,7 @@ func (h *EnsureUserHandler) EnsureUser(c *gin.Context) {
 	}
 
 	// Build response
-	response := HasuraActionResponse{
+	response := handler.HasuraActionResponse{
 		ID:          userData.ID,
 		DisplayName: userData.DisplayName,
 		AvatarURL:   userData.AvatarURL,

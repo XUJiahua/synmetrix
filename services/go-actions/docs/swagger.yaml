@@ -75,41 +75,6 @@ info:
   title: Go Actions - Keycloak JIT User Sync API
   version: 1.0.0
 paths:
-  /ensure-user:
-    post:
-      consumes:
-      - application/json
-      description: JIT user synchronization - creates user in Hasura if not exists,
-        fetching data from Keycloak
-      parameters:
-      - description: Hasura Action Request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.HasuraActionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HasuraActionResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handler.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.ErrorResponse'
-      summary: Ensure user exists (Hasura Action)
-      tags:
-      - users
   /health:
     get:
       description: Check if the service is running
@@ -123,4 +88,39 @@ paths:
       summary: Health check
       tags:
       - health
+  /rpc/ensure_user:
+    post:
+      consumes:
+      - application/json
+      description: Just-in-time user synchronization - creates user in Hasura if not
+        exists, fetching data from Keycloak
+      parameters:
+      - description: Hasura Action Request with session_variables
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.HasuraActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User data (id, display_name, email, avatar_url)
+          schema:
+            $ref: '#/definitions/handler.HasuraActionResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Missing or invalid user ID in session
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Failed to sync user from Keycloak
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Ensure user exists (JIT User Sync)
+      tags:
+      - actions
 swagger: "2.0"
