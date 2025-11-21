@@ -41,8 +41,10 @@ func (r *Router) Register(method string, handler ActionHandler) {
 // It looks up the handler by method name and delegates to it
 func (r *Router) Handle(c *gin.Context) {
 	method := c.Param("method")
+	r.logger.Debugf("Handle: received RPC request for method: %s", method)
+
 	if method == "" {
-		r.logger.Warn("Missing method parameter in RPC request")
+		r.logger.Warn("Handle: missing method parameter in RPC request")
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Message: "missing method parameter",
 			Code:    "INVALID_REQUEST",
@@ -53,16 +55,19 @@ func (r *Router) Handle(c *gin.Context) {
 	// Support both hyphenated and underscore method names
 	// e.g., both "ensure-user" and "ensure_user" work
 	normalizedMethod := strings.ReplaceAll(method, "-", "_")
+	r.logger.Debugf("Handle: normalized method name: %s -> %s", method, normalizedMethod)
 
 	handler, exists := r.handlers[normalizedMethod]
 	if !exists {
-		r.logger.Warnf("RPC method not found: %s", method)
+		r.logger.Warnf("Handle: RPC method not found: %s", method)
 		c.JSON(http.StatusNotFound, ErrorResponse{
 			Message: "method not found",
 			Code:    "METHOD_NOT_FOUND",
 		})
 		return
 	}
+
+	r.logger.Debugf("Handle: found handler for method %s, delegating request", normalizedMethod)
 
 	// Delegate to the specific handler
 	handler.Handle(c)

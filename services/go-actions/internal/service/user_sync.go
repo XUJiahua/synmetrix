@@ -31,50 +31,61 @@ func NewUserSyncService(
 
 // EnsureUserExists ensures a user exists in Hasura, creating if necessary
 func (s *UserSyncService) EnsureUserExists(ctx context.Context, userID string) (*hasura.UserData, error) {
-	s.logger.Infof("Ensuring user exists: %s", userID)
+	s.logger.Infof("EnsureUserExists: ensuring user exists: %s", userID)
+	s.logger.Debugf("EnsureUserExists: starting user sync flow for %s", userID)
 
 	// 1. Check if user already exists in Hasura
+	s.logger.Debugf("EnsureUserExists: checking if user %s exists in Hasura", userID)
 	exists, err := s.hasuraClient.CheckUserExists(ctx, userID)
 	if err != nil {
-		s.logger.Errorf("Failed to check if user exists: %v", err)
+		s.logger.Errorf("EnsureUserExists: failed to check if user exists: %v", err)
 		return nil, fmt.Errorf("check user exists: %w", err)
 	}
 
+	s.logger.Debugf("EnsureUserExists: user %s exists in Hasura: %v", userID, exists)
+
 	if exists {
-		s.logger.Infof("User %s already exists, fetching data", userID)
+		s.logger.Infof("EnsureUserExists: user %s already exists, fetching data", userID)
 		userData, err := s.hasuraClient.GetUser(ctx, userID)
 		if err != nil {
+			s.logger.Errorf("EnsureUserExists: failed to get user data: %v", err)
 			return nil, fmt.Errorf("get user: %w", err)
 		}
+		s.logger.Debugf("EnsureUserExists: fetched user data: %+v", userData)
 		return userData, nil
 	}
 
-	s.logger.Infof("User %s does not exist, syncing from Keycloak", userID)
+	s.logger.Infof("EnsureUserExists: user %s does not exist in Hasura, syncing from Keycloak", userID)
 
 	// 2. Fetch user from Keycloak
+	s.logger.Debugf("EnsureUserExists: fetching user %s from Keycloak", userID)
 	kcUser, err := s.keycloakClient.GetUser(ctx, userID)
 	if err != nil {
-		s.logger.Errorf("Failed to get user from Keycloak: %v", err)
+		s.logger.Errorf("EnsureUserExists: failed to get user from Keycloak: %v", err)
 		return nil, fmt.Errorf("get keycloak user: %w", err)
 	}
 
-	s.logger.Infof("Fetched user from Keycloak: %s (%s)", kcUser.Username, kcUser.Email)
+	s.logger.Infof("EnsureUserExists: fetched user from Keycloak: %s (%s)", kcUser.Username, kcUser.Email)
+	s.logger.Debugf("EnsureUserExists: keycloak user data: %+v", kcUser)
 
 	// 3. Create display name
 	displayName := s.buildDisplayName(kcUser)
+	s.logger.Debugf("EnsureUserExists: built display name: %s", displayName)
 
 	// 4. Create user in Hasura
+	s.logger.Debugf("EnsureUserExists: creating user in Hasura with display_name=%s, email=%s", displayName, kcUser.Email)
 	userData, err := s.hasuraClient.CreateUser(ctx, hasura.CreateUserInput{
 		ID:          userID,
 		DisplayName: displayName,
 		Email:       kcUser.Email,
 	})
 	if err != nil {
-		s.logger.Errorf("Failed to create user in Hasura: %v", err)
+		s.logger.Errorf("EnsureUserExists: failed to create user in Hasura: %v", err)
 		return nil, fmt.Errorf("create user in hasura: %w", err)
 	}
 
-	s.logger.Infof("Created user in Hasura: %s", userID)
+	s.logger.Infof("EnsureUserExists: created user in Hasura: %s", userID)
+	s.logger.Debugf("EnsureUserExists: created user data: %+v", userData)
 
 	// 5. Create default team (asynchronously, don't block on failure)
 	// go func() {

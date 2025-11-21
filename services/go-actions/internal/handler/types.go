@@ -2,10 +2,15 @@ package handler
 
 // HasuraActionRequest represents the request from Hasura Action
 type HasuraActionRequest struct {
-	SessionVariables map[string]string      `json:"session_variables" example:"x-hasura-user-id:uuid-here"` // Session variables from Hasura JWT
-	Input            map[string]interface{} `json:"input"`                                                  // Action input parameters (optional)
-	Action           struct {
-		Name string `json:"name" example:"ensure_user_exists"` // Action name
+	// Session variables from Hasura JWT
+	SessionVariables map[string]string `json:"session_variables" example:"x-hasura-user-id:uuid-here"` // @description Session variables from Hasura JWT
+
+	// Action input parameters (optional). Example: {"user_id": "550e8400-e29b-41d4-a716-446655440000"}
+	Input map[string]interface{} `json:"input"` // @description Action input parameters, e.g., user_id for ensure_user action
+
+	// Action metadata
+	Action struct {
+		Name string `json:"name" example:"ensure_user_exists"` // @description Action name
 	} `json:"action"`
 }
 

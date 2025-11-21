@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"go-actions/internal/config"
 	"go-actions/pkg/errors"
+	"go-actions/pkg/logger"
+	"io"
 	"net/http"
 	"time"
 )
@@ -16,16 +18,24 @@ type Client struct {
 	endpoint    string
 	adminSecret string
 	httpClient  *http.Client
+	logger      *logger.Logger
 }
 
 // NewClient creates a new Hasura client
 func NewClient(cfg *config.Config) *Client {
+	return NewClientWithLogger(cfg, logger.New())
+}
+
+// NewClientWithLogger creates a new Hasura client with custom logger
+func NewClientWithLogger(cfg *config.Config, log *logger.Logger) *Client {
+	log.Debugf("Hasura client initialized with endpoint %s", cfg.HasuraEndpoint)
 	return &Client{
 		endpoint:    cfg.HasuraEndpoint,
 		adminSecret: cfg.HasuraAdminSecret,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		logger: log,
 	}
 }
 
@@ -107,6 +117,9 @@ func (c *Client) CreateDefaultTeam(ctx context.Context, userID string) error {
 
 // query executes a GraphQL query/mutation
 func (c *Client) query(ctx context.Context, query string, variables map[string]interface{}, result interface{}) error {
+	c.logger.Debugf("query: executing GraphQL query with variables: %v", variables)
+	c.logger.Debugf("query: GraphQL query: %s", query)
+
 	reqBody := GraphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -114,11 +127,15 @@ func (c *Client) query(ctx context.Context, query string, variables map[string]i
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
+		c.logger.Errorf("query: failed to marshal request: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "marshal request failed")
 	}
 
+	c.logger.Debugf("query: sending request to %s", c.endpoint)
+
 	req, err := http.NewRequestWithContext(ctx, "POST", c.endpoint, bytes.NewReader(bodyBytes))
 	if err != nil {
+		c.logger.Errorf("query: failed to create request: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "create request failed")
 	}
 
@@ -127,32 +144,44 @@ func (c *Client) query(ctx context.Context, query string, variables map[string]i
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		c.logger.Errorf("query: request failed: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "request failed")
 	}
 	defer resp.Body.Close()
 
+	c.logger.Debugf("query: received status code %d", resp.StatusCode)
+
 	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		c.logger.Errorf("query: unexpected status code %d, response body: %s", resp.StatusCode, string(bodyBytes))
 		return errors.New(errors.ErrCodeHasuraAPI, fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
 	}
 
 	var gqlResp GraphQLResponse
 	if err := json.NewDecoder(resp.Body).Decode(&gqlResp); err != nil {
+		c.logger.Errorf("query: failed to decode response: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "decode response failed")
 	}
 
 	if len(gqlResp.Errors) > 0 {
+		c.logger.Errorf("query: GraphQL errors: %v", gqlResp.Errors)
 		return errors.New(errors.ErrCodeHasuraAPI, fmt.Sprintf("GraphQL errors: %v", gqlResp.Errors))
 	}
+
+	c.logger.Debugf("query: GraphQL response data: %+v", gqlResp.Data)
 
 	// Convert gqlResp.Data to result
 	dataBytes, err := json.Marshal(gqlResp.Data)
 	if err != nil {
+		c.logger.Errorf("query: failed to marshal data: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "marshal data failed")
 	}
 
 	if err := json.Unmarshal(dataBytes, result); err != nil {
+		c.logger.Errorf("query: failed to unmarshal data: %v", err)
 		return errors.Wrap(err, errors.ErrCodeHasuraAPI, "unmarshal data failed")
 	}
 
+	c.logger.Debugf("query: successfully executed GraphQL query")
 	return nil
 }

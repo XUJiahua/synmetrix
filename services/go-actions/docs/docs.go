@@ -40,7 +40,7 @@ const docTemplate = `{
         },
         "/rpc/ensure_user": {
             "post": {
-                "description": "Just-in-time user synchronization - creates user in Hasura if not exists, fetching data from Keycloak",
+                "description": "Just-in-time user synchronization - creates user in Hasura if not exists, fetching data from Keycloak. Accepts user_id in input parameters or falls back to x-hasura-user-id from session variables.",
                 "consumes": [
                     "application/json"
                 ],
@@ -53,7 +53,7 @@ const docTemplate = `{
                 "summary": "Ensure user exists (JIT User Sync)",
                 "parameters": [
                     {
-                        "description": "Hasura Action Request with session_variables",
+                        "description": "Hasura Action Request with user_id in input",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -76,7 +76,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid user ID in session",
+                        "description": "Missing or invalid user ID in input or session",
                         "schema": {
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
@@ -111,17 +111,18 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "action": {
+                    "description": "Action metadata",
                     "type": "object",
                     "properties": {
                         "name": {
-                            "description": "Action name",
+                            "description": "@description Action name",
                             "type": "string",
                             "example": "ensure_user_exists"
                         }
                     }
                 },
                 "input": {
-                    "description": "Action input parameters (optional)",
+                    "description": "Action input parameters (optional). Example: {\"user_id\": \"550e8400-e29b-41d4-a716-446655440000\"}",
                     "type": "object",
                     "additionalProperties": true
                 },

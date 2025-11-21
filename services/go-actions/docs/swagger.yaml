@@ -14,15 +14,16 @@ definitions:
   handler.HasuraActionRequest:
     properties:
       action:
+        description: Action metadata
         properties:
           name:
-            description: Action name
+            description: '@description Action name'
             example: ensure_user_exists
             type: string
         type: object
       input:
         additionalProperties: true
-        description: Action input parameters (optional)
+        description: 'Action input parameters (optional). Example: {"user_id": "550e8400-e29b-41d4-a716-446655440000"}'
         type: object
       session_variables:
         additionalProperties:
@@ -93,9 +94,10 @@ paths:
       consumes:
       - application/json
       description: Just-in-time user synchronization - creates user in Hasura if not
-        exists, fetching data from Keycloak
+        exists, fetching data from Keycloak. Accepts user_id in input parameters or
+        falls back to x-hasura-user-id from session variables.
       parameters:
-      - description: Hasura Action Request with session_variables
+      - description: Hasura Action Request with user_id in input
         in: body
         name: request
         required: true
@@ -113,7 +115,7 @@ paths:
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "401":
-          description: Missing or invalid user ID in session
+          description: Missing or invalid user ID in input or session
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":

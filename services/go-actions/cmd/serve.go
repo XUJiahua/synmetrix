@@ -60,6 +60,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// 2. Initialize logger
 	log := logger.New()
 	log.Info("Starting go-actions server")
+	if log.IsDebugEnabled() {
+		log.Info("Debug mode is enabled")
+	}
 
 	// 3. Set Gin mode (release in production)
 	if os.Getenv("GIN_MODE") == "" {
@@ -67,10 +70,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	// 4. Initialize clients
-	kcClient := keycloak.NewClient(cfg)
+	kcClient := keycloak.NewClientWithLogger(cfg, log)
 	log.Info("Keycloak client initialized")
 
-	hasuraClient := hasura.NewClient(cfg)
+	hasuraClient := hasura.NewClientWithLogger(cfg, log)
 	log.Info("Hasura client initialized")
 
 	// 5. Initialize service
@@ -94,11 +97,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// RPC endpoint - handles all actions via /rpc/:method
 	router.POST("/rpc/:method", rpcRouter.Handle)
 	log.Info("Registered POST /rpc/:method endpoint")
-
-	// Additional explicit routes for Swagger documentation
-	// These are the same handlers but with specific paths for better Swagger docs
-	router.POST("/rpc/ensure_user", ensureUserSwagger(ensureUserHandler))
-	log.Info("Registered POST /rpc/ensure_user endpoint (Swagger)")
 
 	// Health check endpoint
 	router.GET("/health", healthCheck)
@@ -181,22 +179,6 @@ func ginLogger(log *logger.Logger) gin.HandlerFunc {
 			clientIP,
 		)
 	}
-}
-
-// ensureUserSwagger godoc
-// @Summary      Ensure user exists (JIT User Sync)
-// @Description  Just-in-time user synchronization - creates user in Hasura if not exists, fetching data from Keycloak
-// @Tags         actions
-// @Accept       json
-// @Produce      json
-// @Param        request body handler.HasuraActionRequest true "Hasura Action Request with session_variables"
-// @Success      200 {object} handler.HasuraActionResponse "User data (id, display_name, email, avatar_url)"
-// @Failure      400 {object} handler.ErrorResponse "Invalid request body"
-// @Failure      401 {object} handler.ErrorResponse "Missing or invalid user ID in session"
-// @Failure      500 {object} handler.ErrorResponse "Failed to sync user from Keycloak"
-// @Router       /rpc/ensure_user [post]
-func ensureUserSwagger(h *rpc.EnsureUserHandler) gin.HandlerFunc {
-	return h.Handle
 }
 
 // healthCheck godoc
