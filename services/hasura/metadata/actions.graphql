@@ -17,7 +17,9 @@ type Mutation {
 }
 
 type Mutation {
-  ensure_user: EnsureUserOutput
+  ensure_user(
+    user_id: String
+  ): EnsureUserOutput
 }
 
 type Mutation {
