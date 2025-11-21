@@ -17,6 +17,10 @@ type Mutation {
 }
 
 type Mutation {
+  ensure_user: EnsureUserOutput
+}
+
+type Mutation {
   export_data_models(
     branch_id: String
   ): ExportDataModelsOutput
@@ -186,5 +190,12 @@ type PreAggregationPreviewOutput {
 type SendTestAlertOutput {
   error: Boolean
   result: json
+}
+
+type EnsureUserOutput {
+  avatarUrl: String
+  displayName: String
+  email: String
+  id: String
 }
 

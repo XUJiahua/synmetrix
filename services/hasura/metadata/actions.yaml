@@ -21,6 +21,13 @@ actions:
       forward_client_headers: true
     permissions:
       - role: user
+  - name: ensure_user
+    definition:
+      kind: synchronous
+      handler: '{{GO_ACTIONS_URL}}/rpc/ensure_user'
+    permissions:
+      - role: user
+    comment: Just-in-time user synchronization - creates user in Hasura if not exists, fetching data from Keycloak
   - name: export_data_models
     definition:
       kind: synchronous
@@ -119,4 +126,5 @@ custom_types:
     - name: PreAggregationsOutput
     - name: PreAggregationPreviewOutput
     - name: SendTestAlertOutput
+    - name: EnsureUserOutput
   scalars: []
