@@ -1,0 +1,16 @@
+{
+  "realm": "hasura-app",
+  "roles": {
+    "client": {
+      "hasura": [
+        {
+          "name": "user",
+          "description": "",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        }
+      ]
+    }
+  }
+}
