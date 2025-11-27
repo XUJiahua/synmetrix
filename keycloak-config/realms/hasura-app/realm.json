@@ -117,6 +117,7 @@
     "cibaAuthRequestedUserHint": "login_hint",
     "oauth2DevicePollingInterval": "5",
     "clientOfflineSessionMaxLifespan": "0",
+    "de.adorsys.keycloak.config.import-checksum-default": "8506744d929065e15df6a247654980b3ed41d5774996e5fca4d2e80aa3288836",
     "clientSessionIdleTimeout": "0",
     "actionTokenGeneratedByUserLifespan.verify-email": "",
     "actionTokenGeneratedByUserLifespan.idp-verify-account-via-email": "",
@@ -126,10 +127,12 @@
     "realmReusableOtpCode": "false",
     "cibaExpiresIn": "120",
     "oauth2DeviceCodeLifespan": "600",
+    "de.adorsys.keycloak.config.state-default-roles-client-hasura-0": "[\"user\"]",
     "parRequestUriLifespan": "60",
     "clientSessionMaxLifespan": "0",
     "shortVerificationUri": "",
-    "actionTokenGeneratedByUserLifespan.reset-credentials": ""
+    "actionTokenGeneratedByUserLifespan.reset-credentials": "",
+    "de.adorsys.keycloak.config.state-default-clients-0": "[\"hasura\"]"
   },
   "userManagedAccessAllowed": false,
   "organizationsEnabled": false,
