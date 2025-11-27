@@ -25,7 +25,9 @@ ENV CUBEJS_REST_API_URL $CUBEJS_REST_API_URL
 ENV CUBEJS_API_DOCS_URL $CUBEJS_API_DOCS_URL
 
 WORKDIR $APP_DIR
-RUN curl https://github.com/mlcraft-io/client-v2/releases/download/$CLIENT_VERSION/dist.tar.gz -L | tar -xz -C $APP_DIR && \
+COPY dist.tar.gz dist.tar.gz
+RUN tar -xz -f dist.tar.gz -C $APP_DIR && \
+    rm dist.tar.gz && \
     rm -rf /usr/share/nginx/html && \
     mv $APP_DIR/dist /usr/share/nginx/html
 

@@ -106,3 +106,5 @@ __pycache__
 /.cubestore
 /infra/aws/.pulumi-passphrase
 /letsencrypt/acme.json
+
+dist.tar.gz

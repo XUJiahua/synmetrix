@@ -218,5 +218,49 @@ services:
     networks:
       - synmetrix_default
 
+  agents:
+    build:
+      context: ../text2sql
+      dockerfile: Dockerfile
+    container_name: agents
+    env_file:
+      - .my.env
+    ports:
+      - "7777:8000"
+    volumes:
+      # - ./logs:/app/logs
+      - ./cubes:/app/cubes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7777/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - synmetrix_default
+
+  client:
+    build:
+      context: ./services/client/
+      args:
+        CLIENT_VERSION: ${CLIENT_VERSION}
+        HASURA_GRAPHQL_ENDPOINT: /v1/graphql
+        HASURA_WS_ENDPOINT: /v1/graphql
+        CUBEJS_MYSQL_API_URL: localhost:13306
+        CUBEJS_PG_API_URL: localhost:15432
+        CUBEJS_REST_API_URL: /api/v1/load
+        CUBEJS_API_DOCS_URL: http://localhost:4000/docs
+    restart: always
+    ports:
+      - 8888:8888
+    depends_on:
+      - hasura
+      - cubejs
+      - actions
+      - agents
+    networks:
+      - synmetrix_default
+
 volumes:
   pgstorage-data:
