@@ -44,8 +44,8 @@ services:
     build:
       context: ./services/go-actions/
     restart: always
-    ports:
-      - 3001:3000
+    # ports:
+    #   - 3001:3000
     env_file:
       - .env
       - .my.env
@@ -85,8 +85,10 @@ services:
     volumes:
       - ./services/cubejs/src:/app/src
       - ./services/cubejs/index.js:/app/index.js
+    # 4000 is reserved at Windows/WSL2, check reserved ports via:
+    # netsh interface ipv4 show excludedportrange protocol=tcp
     ports:
-      - 4000:4000
+      - 4200:4000
       - 9231:9229
       - 13306:13306
       - 15432:15432
