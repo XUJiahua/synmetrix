@@ -251,6 +251,11 @@ services:
         CUBEJS_PG_API_URL: localhost:15432
         CUBEJS_REST_API_URL: /api/v1/load
         CUBEJS_API_DOCS_URL: http://localhost:4000/docs
+        KEYCLOAK_URL: http://localhost:8082
+        KEYCLOAK_REDIRECT_URI: http://localhost:8888/userauth/callback
+        KEYCLOAK_REALM: hasura-app
+        KEYCLOAK_CLIENT_ID: hasura
+        
     restart: always
     ports:
       - 8888:8888

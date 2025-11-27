@@ -14,11 +14,13 @@
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
         "/*",
-        "http://localhost:8000/userauth/callback"
+        "http://localhost:8000/userauth/callback",
+        "http://localhost:8888/userauth/callback"
       ],
       "webOrigins": [
         "/*",
-        "http://localhost:8000"
+        "http://localhost:8000",
+        "http://localhost:8888"
       ],
       "notBefore": 0,
       "bearerOnly": false,
