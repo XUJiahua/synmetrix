@@ -10,7 +10,7 @@ CLIENT_DIST_TAR="$ROOT_DIR/services/client/dist.tar.gz"
 
 # build agent-ui
 cd "$AGENT_UI_DIR"
-pnpm build
+NEXT_PUBLIC_DEFAULT_ENDPOINT=/agents-api pnpm build
 
 # build main client
 cd "$CLIENT_DIR"
